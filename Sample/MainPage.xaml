@@ -1,0 +1,72 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="Sample.MainPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Sample"
+             xmlns:mpowerkit="clr-namespace:MPowerKit.VirtualizeListView;assembly=MPowerKit.VirtualizeListView">
+
+    <Grid RowDefinitions="50,*">
+        <Grid ColumnDefinitions="*,*,*,*"
+              ColumnSpacing="15">
+            <Button Clicked="Button_Clicked_Add"
+                    Text="Add" />
+            <Button Grid.Column="1"
+                    Clicked="Button_Clicked_Remove"
+                    Text="Remove" />
+            <Button Grid.Column="2"
+                    Clicked="Button_Clicked_Replace"
+                    Text="Replace" />
+            <Button Grid.Column="3"
+                    Clicked="Button_Clicked_Move"
+                    Text="Move" />
+        </Grid>
+
+        <mpowerkit:FixedRefreshView Grid.Row="1"
+                                    Refreshing="FixedRefreshView_Refreshing">
+            <mpowerkit:VirtualizeListView x:Name="listView"
+                                          Grid.Row="1"
+                                          Padding="15"
+                                          IsGrouped="False">
+                <!--<mpowerkit:VirtualizeListView.ItemsLayout>
+                    <mpowerkit:LinearLayout ItemSpacing="15" />
+                </mpowerkit:VirtualizeListView.ItemsLayout>-->
+                <!--<mpowerkit:VirtualizeListView.GroupHeaderTemplate>
+                    <DataTemplate>
+                        <Grid Padding="15"
+                              BackgroundColor="Aqua">
+                            <Label Text="{Binding Key}" />
+                        </Grid>
+                    </DataTemplate>
+                </mpowerkit:VirtualizeListView.GroupHeaderTemplate>-->
+                <mpowerkit:VirtualizeListView.ItemTemplate>
+                    <DataTemplate x:DataType="local:Item">
+                        <mpowerkit:VirtualizeListViewCell BackgroundColor="Red">
+                            <Grid ColumnDefinitions="70,*"
+                                  ColumnSpacing="15"
+                                  RowDefinitions="70,*"
+                                  RowSpacing="10">
+                                <Image Aspect="AspectFill"
+                                       Source="{Binding Image}" />
+                                <StackLayout Grid.Column="1"
+                                             VerticalOptions="Center">
+                                    <Label FontAttributes="Bold"
+                                           FontSize="22"
+                                           Text="{Binding Title}" />
+                                    <Label FontSize="16"
+                                           Text="{Binding Id}" />
+                                </StackLayout>
+                                <Label Grid.Row="1"
+                                       Grid.ColumnSpan="2"
+                                       FontAttributes="Italic"
+                                       FontSize="18"
+                                       LineBreakMode="WordWrap"
+                                       Text="{Binding Description}" />
+                            </Grid>
+                        </mpowerkit:VirtualizeListViewCell>
+                    </DataTemplate>
+                </mpowerkit:VirtualizeListView.ItemTemplate>
+            </mpowerkit:VirtualizeListView>
+
+        </mpowerkit:FixedRefreshView>
+    </Grid>
+</ContentPage>
