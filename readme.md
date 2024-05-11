@@ -12,7 +12,7 @@ So, under the hood it is a ```ScrollView``` with ```AbsoluteLayout``` as items l
 
 | Android | Windows |
 |-|-|
-| <video src="android.mp4" controls="controls" width="287" height="630"> | <video src="windows.mp4" controls="controls" width="426" height="240"> |
+| <video src="https://github.com/MPowerKit/VirtualizeListView/assets/23138430/edd8aa08-3a6a-404f-9e95-28343b13498f" controls="controls" width="287" height="630"/> | <video src="windows.mp4" controls="controls" width="426" height="240"/> |
 
 ### Implemented features:
 
