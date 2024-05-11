@@ -6,6 +6,8 @@
 
 It's not a secret to anybody, that ```ListView``` and ```CollectionView``` in MAUI have bad scrolling performance. This project started as an experimantal project to find a way to make a virtualize listview using ```ScrollView``` and ```AbsoluteLayout``` only. Suprisingly, the scrolling performance is way better, than was expected. So you can check it right now.
 
+It works on all platforms MAUI supports and it has the same behavior on all platforms, because it does not have platform-specific code. 
+
 So, under the hood it is a ```ScrollView``` with ```AbsoluteLayout``` as items layout. The main idea of virtualization for this listview is to change Translation of items while keeping them attached to the ```AbsoluteLayout```. ```ItemsLayout``` is responsible for virtualization process and for creating / removing views and it will not create more views as necessary.
 
 **Your PRs are welcome!**
