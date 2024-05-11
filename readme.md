@@ -12,7 +12,7 @@ So, under the hood it is a ```ScrollView``` with ```AbsoluteLayout``` as items l
 
 | Android | Windows |
 |-|-|
-| <video src="android.mp4" alt="showcase" width="287" height="630"> | <video src="windows.mp4" alt="showcase" width="426" height="240"> |
+| <video src="android.mp4" controls="controls" width="287" height="630"> | <video src="windows.mp4" controls="controls" width="426" height="240"> |
 
 ### Implemented features:
 
