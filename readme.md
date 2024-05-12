@@ -54,7 +54,7 @@ To change items spacing you need to reset the ```ItemsLayout``` property as next
 ```xaml
 <mpowerkit:VirtualizeListView>
 	<mpowerkit:VirtualizeListView.ItemsLayout>
-		<mpowerkit:LinearItemsLayout ItemSpacing="15" />
+		<mpowerkit:LinearLayout ItemSpacing="15" />
 	</mpowerkit:VirtualizeListView.ItemsLayout>
 </mpowerkit:VirtualizeListView>
 ```
