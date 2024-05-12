@@ -196,9 +196,26 @@ public class DataAdapter : IDisposable
 
         if (holder.Children[0] is not VirtualizeListViewCell cell) return;
 
-        var index = position - HasHeader.ToInt();
         cell.SendAppearing();
-        Control.OnItemAppearing(data, index);
+        OnItemAppearing(data, position);
+    }
+
+    protected virtual void OnItemAppearing(object item, int position)
+    {
+        var additional = HasHeader.ToInt();
+
+        var realPosition = position - additional;
+
+        var count = InternalItems.Count - additional - HasFooter.ToInt();
+
+        if (count == 0) return;
+
+        if (count <= Control.RemainingItemsThreshold) return;
+
+        if (realPosition >= count - Control.RemainingItemsThreshold)
+        {
+            Control.OnItemAppearing(item, realPosition);
+        }
     }
 
     public virtual void OnCellRecycled(CellHolder holder, int position)

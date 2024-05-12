@@ -13,7 +13,7 @@ public class VirtualizeListView : ScrollView
     public event EventHandler<object> ItemDisappearing;
     public event EventHandler<object> ItemTapped;
 
-    private object? _prevAppearedItem;
+    protected object? PrevAppearedItem { get; set; }
 
     public ScrollOrientation PrevScrollOrientation { get; protected set; }
 
@@ -115,7 +115,7 @@ public class VirtualizeListView : ScrollView
     {
         if (e.PropertyName == RefreshView.IsRefreshingProperty.PropertyName)
         {
-            _prevAppearedItem = null;
+            PrevAppearedItem = null;
         }
     }
 
@@ -127,27 +127,18 @@ public class VirtualizeListView : ScrollView
         }
     }
 
-    public virtual void OnItemAppearing(object data, int index)
+    public virtual void OnItemAppearing(object item, int index)
     {
         if (ItemsSource is null) return;
 
-        ItemAppearing?.Invoke(this, data);
+        ItemAppearing?.Invoke(this, item);
 
-        var count = CountItems(ItemsSource);
-
-        if (count == 0) return;
-
-        if (count <= RemainingItemsThreshold) return;
-
-        if (index >= count - RemainingItemsThreshold)
+        if (PrevAppearedItem is null || PrevAppearedItem != item)
         {
-            if (_prevAppearedItem is null || _prevAppearedItem != data)
+            PrevAppearedItem = item;
+            if (ThresholdCommand?.CanExecute(null) is true)
             {
-                _prevAppearedItem = data;
-                if (ThresholdCommand?.CanExecute(null) is true)
-                {
-                    ThresholdCommand.Execute(null);
-                }
+                ThresholdCommand.Execute(null);
             }
         }
     }
@@ -173,16 +164,6 @@ public class VirtualizeListView : ScrollView
 #if !ANDROID
         ScrollToAsync(ScrollX + dx, ScrollY + dy, false);
 #endif
-    }
-
-    private static int CountItems(IEnumerable enumerable)
-    {
-        int count = 0;
-        foreach (var item in enumerable)
-        {
-            count++;
-        }
-        return count;
     }
 
     #region Adapter

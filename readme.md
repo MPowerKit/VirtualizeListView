@@ -33,6 +33,7 @@ So, under the hood it is a ```ScrollView``` with ```AbsoluteLayout``` as items l
 - [x] Add, Remove, Replace, Move, Reset operations on collection
 - [ ] Drag and drop (reordering)
 - [ ] Sticky headers
+- [ ] Animated add/remove/move operations
 
 ### Usage
 
@@ -68,11 +69,11 @@ To disable scroll set ```CanScroll``` property to ```false```, and do not change
 
 #### ```FixedRefreshView```
 
-This package brings to you fixed MAUI's RefreshView as ```FixedRefreshView```. Also, you can disable refreshing without disabling entire collection. For this you may use ```IsPullToRefreshEnabled```.
+This package brings to you fixed MAUI's RefreshView as ```FixedRefreshView```. Here, you can disable refreshing without disabling entire collection. For this you may use ```IsPullToRefreshEnabled```.
 
 #### ```ObservableRangeCollection```
 
-Also, this package contains ```ObservableRangeCollection``` which is a ```ObservableCollection```, but it has a bunch of useful methods to manipulate the collection with range updates. Recommended to use with ```VirtualizeListView```.
+Also, this package contains ```ObservableRangeCollection``` which is a ```ObservableCollection```, but it has a bunch of useful methods to manipulate the collection with batch updates. Recommended to use with ```VirtualizeListView```. It provides few methods: ```AddRange```, ```InsertRange```, ```RemoveRange```, ```ReplaceRange```.
 
 ## Known issues
 
