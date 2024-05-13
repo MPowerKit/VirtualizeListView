@@ -23,7 +23,7 @@ public class VirtualizeListView : ScrollView
 
         Adapter = new GroupableDataAdapter(this);
 
-        ItemsLayout = new LinearLayout();
+        OnItemsLayoutSet();
     }
 
     protected override void OnPropertyChanging([CallerMemberName] string? propertyName = null)
@@ -191,7 +191,8 @@ public class VirtualizeListView : ScrollView
         BindableProperty.Create(
             nameof(ItemsLayout),
             typeof(IItemsLayout),
-            typeof(VirtualizeListView));
+            typeof(VirtualizeListView),
+            new LinearLayout());
     #endregion
 
     #region LayoutManager
