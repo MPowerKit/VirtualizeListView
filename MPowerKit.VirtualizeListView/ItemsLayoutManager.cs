@@ -253,7 +253,11 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
 
     protected virtual void AdapterDataSetChanged(object? sender, EventArgs e)
     {
-        if (LaidOutItems.Count == 0 && CachedItems.Count == 0)
+        if (Control!.Adapter.ItemsCount == 0 && LaidOutItems.Count == 0)
+        {
+            return;
+        }
+        else if (LaidOutItems.Count == 0 && CachedItems.Count == 0)
         {
             InvalidateLayout();
         }
