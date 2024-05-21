@@ -264,6 +264,7 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
         else if (LaidOutItems.Count > 0)
         {
             AdapterItemRangeChanged(this, (0, LaidOutItems.Count, Control.Adapter.ItemsCount));
+            Control.ScrollToAsync(0, 0, false);
         }
         else if (LaidOutItems.Count == 0)
         {
@@ -383,8 +384,8 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
         }
 
         var itemsToRearrange = LaidOutItems.FindAll(i => i.IsOnScreen && i.IsAttached);
-        var firstVisibleItem = itemsToRearrange.First();
-        var prevVisibleCellBounds = firstVisibleItem.CellBounds;
+        var firstVisibleItem = itemsToRearrange.FirstOrDefault();
+        var prevVisibleCellBounds = firstVisibleItem?.CellBounds ?? new();
         var lastVisibleItemBeforRemoved = itemsToRearrange.FindLast(i => i.Position < startingIndex);
         var prevIndex = startingIndex - 1;
         var itemBeforeRemoved = prevIndex < 0 ? null : LaidOutItems[prevIndex];
@@ -425,7 +426,7 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
             ShiftAllItems(LaidOutItems, itemsToRearrange[^1].Position + 1, count);
         }
 
-        if (AdjustScrollIfNeeded(LaidOutItems, firstVisibleItem, prevVisibleCellBounds)) return;
+        if (AdjustScrollIfNeeded(LaidOutItems, firstVisibleItem!, prevVisibleCellBounds)) return;
 
         UpdateItemsLayout(startingIndex, false);
     }

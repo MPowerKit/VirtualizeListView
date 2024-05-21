@@ -13,7 +13,7 @@
 
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<Title>MPowerKit.Navigation</Title>
-		<Version>1.0.2</Version>
+		<Version>1.0.3</Version>
 		<Authors>MPowerKit,Alex Dobrynin</Authors>
 		<Description>MAUI Virtualize ListView with smooth scrolling and without platform-specific code</Description>
 		<Copyright>MPowerKit</Copyright>
