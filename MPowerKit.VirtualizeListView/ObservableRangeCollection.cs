@@ -191,7 +191,7 @@ public class ObservableRangeCollection<T> : ObservableCollection<T>
 
         ArgumentOutOfRangeException.ThrowIfNegative(index);
 
-        Items[index] = newItem;
+        this[index] = newItem;
     }
 
     /// <summary>
