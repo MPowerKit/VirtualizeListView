@@ -18,6 +18,8 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
     protected List<VirtualizeListViewItem> LaidOutItems { get; } = [];
     protected List<VirtualizeListViewItem> CachedItems { get; } = [];
 
+    public List<(object Data, int Position)> VisibleItems => LaidOutItems.FindAll(i => i.IsOnScreen && i.IsAttached && i.Cell?.Children[0] is VirtualizeListViewCell).Select(i => (i.BindingContext, i.Position)).ToList();
+
     protected virtual Size AvailableSpace => GetAvailableSpace();
 
     protected bool PendingAdjustScroll { get; set; }

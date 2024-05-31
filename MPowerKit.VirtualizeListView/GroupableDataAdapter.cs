@@ -120,51 +120,24 @@ public class GroupableDataAdapter : DataAdapter
         OnItemAppearing(data, position);
     }
 
-    protected override void OnItemAppearing(object item, int position)
+    public override (int RealPosition, int RealItemsCount) GetRealPositionAndCount(object item, int position)
     {
-        var additional = HasHeader.ToInt();
+        var header = HasHeader.ToInt();
 
         var totalCount = InternalItems.Count;
 
         var groupItemsCount = InternalItems.Count(i => i is GroupItem);
 
         var realPosition = 0;
-        for (int i = additional; i < position; i++)
+        for (int i = header; i < position; i++)
         {
             if (InternalItems[i] is GroupItem) continue;
             realPosition++;
         }
 
-        var count = totalCount - groupItemsCount - additional - HasFooter.ToInt();
+        var realItemsCount = totalCount - groupItemsCount - header - HasFooter.ToInt();
 
-        if (count == 0) return;
-
-        if (count <= Control.RemainingItemsThreshold) return;
-
-        if (realPosition >= count - Control.RemainingItemsThreshold)
-        {
-            Control.OnItemAppearing(item, realPosition);
-        }
-    }
-
-    public override void OnCellRecycled(CellHolder holder, int position)
-    {
-        var content = holder.Children[0];
-
-        try
-        {
-            if (content is not VirtualizeListViewCell cell) return;
-
-            cell.SendDisappearing();
-            Control.SendItemDisappearing(holder.BindingContext, position - HasHeader.ToInt());
-        }
-        finally
-        {
-            // commented out for better perfomance
-            // theoretically bindingcontext should be nullified
-            // but practically performance getting worse if uncommented
-            //holder.BindingContext = null;
-        }
+        return (realPosition, realItemsCount);
     }
 
     protected virtual int GetFlattenedIndexOfGroup(IEnumerable group)

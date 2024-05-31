@@ -202,37 +202,23 @@ public class DataAdapter : IDisposable
 
     protected virtual void OnItemAppearing(object item, int position)
     {
-        var additional = HasHeader.ToInt();
+        var (realPosition, realItemsCount) = GetRealPositionAndCount(item, position);
 
-        var realPosition = position - additional;
+        if (realItemsCount == 0) return;
 
-        var count = InternalItems.Count - additional - HasFooter.ToInt();
-
-        if (count == 0) return;
-
-        if (count <= Control.RemainingItemsThreshold) return;
-
-        if (realPosition >= count - Control.RemainingItemsThreshold)
-        {
-            Control.OnItemAppearing(item, realPosition);
-        }
+        Control.OnItemAppearing(item, realPosition, realItemsCount);
     }
 
     public virtual void OnCellRecycled(CellHolder holder, int position)
     {
         var content = holder.Children[0];
 
-        var data = holder.BindingContext;
-
         try
         {
             if (content is not VirtualizeListViewCell cell) return;
 
-            var index = position - HasHeader.ToInt();
-
             cell.SendDisappearing();
-
-            Control.SendItemDisappearing(data, index);
+            OnItemDisappearing(holder.BindingContext, position);
         }
         finally
         {
@@ -241,6 +227,26 @@ public class DataAdapter : IDisposable
             // but practically performance getting worse if uncommented
             //holder.BindingContext = null;
         }
+    }
+
+    protected virtual void OnItemDisappearing(object item, int position)
+    {
+        var (realPosition, realItemsCount) = GetRealPositionAndCount(item, position);
+
+        if (realItemsCount == 0) return;
+
+        Control.OnItemDisappearing(item, realPosition, realItemsCount);
+    }
+
+    public virtual (int RealPosition, int RealItemsCount) GetRealPositionAndCount(object item, int position)
+    {
+        var header = HasHeader.ToInt();
+
+        var realPosition = position - header;
+
+        var realItemsCount = ItemsCount - header - HasFooter.ToInt();
+
+        return (realPosition, realItemsCount);
     }
 
     public virtual void NotifyDataSetChanged()

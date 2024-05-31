@@ -127,11 +127,15 @@ public class VirtualizeListView : ScrollView
         }
     }
 
-    public virtual void OnItemAppearing(object item, int index)
+    public virtual void OnItemAppearing(object item, int realPosition, int realItemsCount)
     {
         if (ItemsSource is null) return;
 
         ItemAppearing?.Invoke(this, item);
+
+        if (realItemsCount <= RemainingItemsThreshold) return;
+
+        if (realPosition < realItemsCount - RemainingItemsThreshold) return;
 
         if (PrevAppearedItem is null || PrevAppearedItem != item)
         {
@@ -143,8 +147,10 @@ public class VirtualizeListView : ScrollView
         }
     }
 
-    public virtual void SendItemDisappearing(object data, int index)
+    public virtual void OnItemDisappearing(object data, int realPosition, int realItemsCount)
     {
+        if (ItemsSource is null) return;
+
         ItemDisappearing?.Invoke(this, data);
     }
 
@@ -155,6 +161,20 @@ public class VirtualizeListView : ScrollView
         if (ItemTapCommand?.CanExecute(data) is not true) return;
 
         ItemTapCommand.Execute(data);
+    }
+
+    public virtual IEnumerable<(object Item, int RealPosition, int RealItemsCount)> GetAllVisibleItems()
+    {
+        var adapter = Adapter;
+
+        var visibleItems = LayoutManager.VisibleItems;
+
+        foreach (var (data, position) in visibleItems)
+        {
+            var (realPosition, realItemsCount) = adapter.GetRealPositionAndCount(data, position);
+
+            yield return (data, realPosition, realItemsCount);
+        }
     }
 
     public virtual void AdjustScroll(double dx, double dy)
