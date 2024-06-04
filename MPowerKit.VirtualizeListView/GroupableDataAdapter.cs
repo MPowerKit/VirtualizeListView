@@ -122,6 +122,11 @@ public class GroupableDataAdapter : DataAdapter
 
     public override (int RealPosition, int RealItemsCount) GetRealPositionAndCount(object item, int position)
     {
+        if (!Control.IsGrouped)
+        {
+            return base.GetRealPositionAndCount(item, position);
+        }
+
         var header = HasHeader.ToInt();
 
         var totalCount = InternalItems.Count;
