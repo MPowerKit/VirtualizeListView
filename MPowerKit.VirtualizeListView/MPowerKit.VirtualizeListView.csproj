@@ -12,7 +12,7 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
 
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-		<Title>MPowerKit.Navigation</Title>
+		<Title>MPowerKit.VirtualizeListView</Title>
 		<Version>1.1.2</Version>
 		<Authors>MPowerKit,Alex Dobrynin</Authors>
 		<Description>MAUI Virtualize ListView with smooth scrolling and without platform-specific code</Description>
