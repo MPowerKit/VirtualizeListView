@@ -270,6 +270,7 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
         else if (LaidOutItems.Count > 0)
         {
             AdapterItemRangeChanged(this, (0, LaidOutItems.Count, Control.Adapter.ItemsCount));
+            if (Control.ScrollX == 0d && Control.ScrollY == 0d) return;
             Control.ScrollToAsync(0, 0, false);
         }
         else if (LaidOutItems.Count == 0)
