@@ -141,6 +141,7 @@ public class FixedRefreshViewRenderer : ViewHandler<FixedRefreshView, FixedRefre
         protected nfloat RefreshControlHeight { get; set; }
         protected UIView RefreshControlParent { get; set; }
         protected UIView? ContentView { get; set; }
+        protected bool PendingRefresh { get; set; }
 
         public RefreshViewWrapper()
         {
@@ -185,10 +186,16 @@ public class FixedRefreshViewRenderer : ViewHandler<FixedRefreshView, FixedRefre
                 if (value)
                 {
                     TryOffsetRefresh(this, value);
+                    if (Window is null)
+                    {
+                        PendingRefresh = true;
+                        return;
+                    }
                     RefreshControl.BeginRefreshing();
                 }
                 else
                 {
+                    PendingRefresh = false;
                     RefreshControl.EndRefreshing();
                     TryOffsetRefresh(this, value);
                 }
@@ -203,13 +210,30 @@ public class FixedRefreshViewRenderer : ViewHandler<FixedRefreshView, FixedRefre
                 if (value)
                 {
                     TryOffsetRefreshAnimated(this, value);
+                    if (Window is null)
+                    {
+                        PendingRefresh = true;
+                        return;
+                    }
                     RefreshControl.BeginRefreshing();
                 }
                 else
                 {
+                    PendingRefresh = false;
                     RefreshControl.EndRefreshing();
                     TryOffsetRefreshAnimated(this, value);
                 }
+            }
+        }
+
+        public override void MovedToWindow()
+        {
+            base.MovedToWindow();
+
+            if (PendingRefresh && Window is not null)
+            {
+                PendingRefresh = false;
+                RefreshControl.BeginRefreshing();
             }
         }
 
@@ -344,7 +368,9 @@ public class FixedRefreshViewRenderer : ViewHandler<FixedRefreshView, FixedRefre
 
             UserInteractionEnabled = true;
 
-            if (IsRefreshing || (isRefreshViewEnabled && RefreshControl.Superview is not null)) return;
+            if (IsRefreshing
+                || (PendingRefresh && Window is null)
+                || (isRefreshViewEnabled && RefreshControl.Superview is not null)) return;
 
             if (isRefreshViewEnabled)
             {
