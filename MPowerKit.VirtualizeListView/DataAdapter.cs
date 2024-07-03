@@ -211,6 +211,8 @@ public class DataAdapter : IDisposable
 
     public virtual void OnCellRecycled(CellHolder holder, int position)
     {
+        holder.WasRecycled = true;
+
         var content = holder.Children[0];
 
         try

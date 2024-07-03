@@ -67,7 +67,6 @@ public class LinearItemsLayoutManager : ItemsLayoutManager
 
             item.CellBounds = new Rect(margin.Left, bottom + margin.Top, newAvailableSpace.Width, request.Request.Height);
             item.Bounds = new Rect(0d, bottom, availableSpace.Width, request.Request.Height + margin.VerticalThickness);
-            item.PendingSizeChange = item.CellBounds.Width != prevCellBounds.Width || item.CellBounds.Height != prevCellBounds.Height;
         }
         else
         {
@@ -82,8 +81,13 @@ public class LinearItemsLayoutManager : ItemsLayoutManager
 
             item.CellBounds = new Rect(right + margin.Left, margin.Top, request.Request.Width, newAvailableSpace.Height);
             item.Bounds = new Rect(right, 0d, request.Request.Width + margin.HorizontalThickness, availableSpace.Height);
+        }
+
+        if (!item.Cell.WasRecycled || item.WasMeasured)
+        {
             item.PendingSizeChange = item.CellBounds.Width != prevCellBounds.Width || item.CellBounds.Height != prevCellBounds.Height;
         }
+        else if (!item.WasMeasured) item.WasMeasured = true;
     }
 
     protected override void ShiftAllItems(IReadOnlyList<VirtualizeListViewItem> items, int start, int exclusiveEnd)

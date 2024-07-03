@@ -14,6 +14,7 @@ public class VirtualizeListViewItem
     public int Position { get; set; } = -1;
     public virtual bool IsOnScreen => IntersectsWithScrollVisibleRect();
     public bool PendingSizeChange { get; set; }
+    public bool WasMeasured { get; set; }
     public bool IsAttached { get; set; }
     public DataTemplate Template { get; set; }
     public object BindingContext { get; set; }
