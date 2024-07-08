@@ -41,11 +41,14 @@ public class VirtualizeListViewItem
 
     public virtual void OnCellSizeChanged()
     {
-        if (PendingSizeChange)
-        {
-            PendingSizeChange = false;
-            return;
-        }
+        // Commented out because it causes a bug where the listview item has image
+        // which is not loaded yet and thus has unknown size (if the size of image is not set directly)
+        // ToDo: Have to find some workaround to avoid multiple remeasuring of the cell to improve the performance
+        //if (PendingSizeChange)
+        //{
+        //    PendingSizeChange = false;
+        //    return;
+        //}
 
         LayoutManager?.OnItemSizeChanged(this);
     }

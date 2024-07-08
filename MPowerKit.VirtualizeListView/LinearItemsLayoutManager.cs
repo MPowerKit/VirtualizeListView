@@ -87,7 +87,7 @@ public class LinearItemsLayoutManager : ItemsLayoutManager
         {
             item.PendingSizeChange = item.CellBounds.Width != prevCellBounds.Width || item.CellBounds.Height != prevCellBounds.Height;
         }
-        else if (!item.WasMeasured) item.WasMeasured = true;
+        if (!item.WasMeasured) item.WasMeasured = true;
     }
 
     protected override void ShiftAllItems(IReadOnlyList<VirtualizeListViewItem> items, int start, int exclusiveEnd)
