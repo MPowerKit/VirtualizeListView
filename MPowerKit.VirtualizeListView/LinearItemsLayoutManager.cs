@@ -42,6 +42,9 @@ public class LinearItemsLayoutManager : ItemsLayoutManager
 
     protected override void ArrangeItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace)
     {
+        if (!items.Contains(item))
+            return;
+        
         var count = items.Count;
 
         if (IsOrientation(ScrollOrientation.Both)
