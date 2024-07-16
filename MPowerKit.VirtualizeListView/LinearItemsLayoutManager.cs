@@ -42,6 +42,7 @@ public class LinearItemsLayoutManager : ItemsLayoutManager
 
     protected override void ArrangeItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace)
     {
+        // temporary fix for https://github.com/MPowerKit/VirtualizeListView/issues/6
         if (!items.Contains(item))
             return;
         
