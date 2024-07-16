@@ -658,7 +658,6 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
     public virtual void OnItemSizeChanged(VirtualizeListViewItem item)
     {
         ArrangeItem(LaidOutItems, item, AvailableSpace);
-        item.PendingSizeChange = false;
         ShiftAllItems(LaidOutItems, item.Position + 1, LaidOutItems.Count);
         DrawAndResize();
     }
@@ -727,6 +726,12 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
         {
             DrawCachedItem(item);
         }
+    }
+
+    protected virtual void CacheItem(VirtualizeListViewItem item)
+    {
+        CachedItems.Add(item);
+        item.IsCached = true;
     }
 
     protected virtual void ReuseOrCreateCell(VirtualizeListViewItem item)

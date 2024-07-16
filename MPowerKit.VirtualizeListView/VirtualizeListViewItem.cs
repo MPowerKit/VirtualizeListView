@@ -13,9 +13,8 @@ public class VirtualizeListViewItem
 
     public int Position { get; set; } = -1;
     public virtual bool IsOnScreen => IntersectsWithScrollVisibleRect();
-    public bool PendingSizeChange { get; set; }
-    public bool WasMeasured { get; set; }
     public bool IsAttached { get; set; }
+    public bool IsCached { get; set; }
     public DataTemplate Template { get; set; }
     public object BindingContext { get; set; }
     public CellHolder? Cell
@@ -41,14 +40,7 @@ public class VirtualizeListViewItem
 
     public virtual void OnCellSizeChanged()
     {
-        // Commented out because it causes a bug where the listview item has image
-        // which is not loaded yet and thus has unknown size (if the size of image is not set directly)
-        // ToDo: Have to find some workaround to avoid multiple remeasuring of the cell to improve the performance
-        //if (PendingSizeChange)
-        //{
-        //    PendingSizeChange = false;
-        //    return;
-        //}
+        if (IsCached) return;
 
         LayoutManager?.OnItemSizeChanged(this);
     }

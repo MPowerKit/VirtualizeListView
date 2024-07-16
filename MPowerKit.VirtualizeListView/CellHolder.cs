@@ -3,7 +3,6 @@
 public class CellHolder : Grid
 {
     public VirtualizeListViewItem? Item { get; set; }
-    public bool WasRecycled { get; set; }
 
     public CellHolder()
     {
