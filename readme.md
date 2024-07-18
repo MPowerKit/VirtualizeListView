@@ -74,7 +74,3 @@ This package brings to you fixed MAUI's RefreshView as ```FixedRefreshView```. H
 #### ```ObservableRangeCollection```
 
 Also, this package contains ```ObservableRangeCollection``` which is a ```ObservableCollection```, but it has a bunch of useful methods to manipulate the collection with batch updates. Recommended to use with ```VirtualizeListView```. It provides few methods: ```AddRange```, ```InsertRange```, ```RemoveRange```, ```ReplaceRange```.
-
-## Known issues
-
-- In debug mode it can have bad scrolling performance, especially on Windows, but in release mode it works surprisingly very well.
