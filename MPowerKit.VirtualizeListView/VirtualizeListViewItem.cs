@@ -40,7 +40,7 @@ public class VirtualizeListViewItem
 
     public virtual void OnCellSizeChanged()
     {
-        if (IsCached) return;
+        if (IsCached || (Cell?.BindingContext is not null && Cell.BindingContext != BindingContext)) return;
 
         LayoutManager?.OnItemSizeChanged(this);
     }

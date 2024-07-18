@@ -1,6 +1,8 @@
 ﻿using System.ComponentModel;
 using System.Runtime.InteropServices;
 
+using Microsoft.Maui.Controls.Internals;
+
 namespace MPowerKit.VirtualizeListView;
 
 public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
@@ -370,7 +372,9 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
 
             if (itemToRemove.Cell is null) continue;
 
-            var itemWithoutCell = LaidOutItems.Find(i => i.Template == itemToRemove.Template && i.Cell is null);
+            var itemWithoutCell = LaidOutItems.Find(i =>
+                (i.Template as IDataTemplateController).Id == (itemToRemove.Template as IDataTemplateController).Id
+                && i.Cell is null);
             if (itemWithoutCell is null)
             {
                 CachedItems.Add(itemToRemove);
@@ -475,7 +479,8 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
             //create
             var item = CreateItemForPosition(dataItems, i);
             LaidOutItems.Insert(i, item);
-            if (itemToRemove.Cell is not null && item.Template == itemToRemove.Template)
+            if (itemToRemove.Cell is not null
+                && (item.Template as IDataTemplateController).Id == (itemToRemove.Template as IDataTemplateController).Id)
             {
                 var cell = itemToRemove.Cell;
                 itemToRemove.Cell = null;
@@ -492,7 +497,9 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
             //reuse
             if (itemToRemove.Cell is not null)
             {
-                var itemWithoutCell = LaidOutItems.Find(i => i.Template == itemToRemove.Template && i.Cell is null);
+                var itemWithoutCell = LaidOutItems.Find(i =>
+                    (i.Template as IDataTemplateController).Id == (itemToRemove.Template as IDataTemplateController).Id
+                    && i.Cell is null);
                 if (itemWithoutCell is null)
                 {
                     CachedItems.Add(itemToRemove);
@@ -536,7 +543,9 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
 
                     if (itemToRemove.Cell is null) continue;
 
-                    var itemWithoutCell = LaidOutItems.Find(i => i.Template == itemToRemove.Template && i.Cell is null);
+                    var itemWithoutCell = LaidOutItems.Find(i =>
+                        (i.Template as IDataTemplateController).Id == (itemToRemove.Template as IDataTemplateController).Id
+                        && i.Cell is null);
                     if (itemWithoutCell is null)
                     {
                         CachedItems.Add(itemToRemove);
@@ -712,12 +721,12 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
 
     protected virtual void DrawAndResize()
     {
+        ResizeLayout();
+
         foreach (var item in LaidOutItems.FindAll(i => i.Cell is not null))
         {
             DrawItem(LaidOutItems, item);
         }
-
-        ResizeLayout();
     }
 
     protected virtual void DrawCachedItems()
@@ -730,15 +739,17 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
 
     protected virtual void CacheItem(VirtualizeListViewItem item)
     {
-        CachedItems.Add(item);
         item.IsCached = true;
+        CachedItems.Add(item);
     }
 
     protected virtual void ReuseOrCreateCell(VirtualizeListViewItem item)
     {
         if (item.Cell is not null) return;
 
-        var freeItem = LaidOutItems.Find(i => i.Template == item.Template && !i.IsAttached && !i.IsOnScreen && i.Cell is not null);
+        var freeItem = LaidOutItems.Find(i =>
+            (i.Template as IDataTemplateController).Id == (item.Template as IDataTemplateController).Id
+            && !i.IsAttached && !i.IsOnScreen && i.Cell is not null);
         if (freeItem is not null)
         {
             var cell = freeItem.Cell;
@@ -747,7 +758,7 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
         }
         else
         {
-            freeItem = CachedItems.Find(i => i.Template == item.Template);
+            freeItem = CachedItems.Find(i => (i.Template as IDataTemplateController).Id == (item.Template as IDataTemplateController).Id);
             if (freeItem is not null)
             {
                 CachedItems.Remove(freeItem);
@@ -777,21 +788,26 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
 
         var lastItem = LaidOutItems[^1];
 
+        Size newSize;
+
         if (IsOrientation(ScrollOrientation.Vertical))
         {
-            this.HeightRequest = lastItem.Bounds.Bottom < (control.Height - control.Padding.VerticalThickness) ? FullSize : lastItem.Bounds.Bottom;
-            this.WidthRequest = FullSize;
+            newSize = new(FullSize,
+                lastItem.Bounds.Bottom < (control.Height - control.Padding.VerticalThickness) ? FullSize : lastItem.Bounds.Bottom);
         }
         else if (IsOrientation(ScrollOrientation.Horizontal))
         {
-            this.HeightRequest = FullSize;
-            this.WidthRequest = lastItem.Bounds.Right < (control.Width - control.Padding.HorizontalThickness) ? FullSize : lastItem.Bounds.Right;
+            newSize = new(lastItem.Bounds.Right < (control.Width - control.Padding.HorizontalThickness) ? FullSize : lastItem.Bounds.Right,
+                FullSize);
         }
         else
         {
-            this.HeightRequest = lastItem.Bounds.Bottom < (control.Height - control.Padding.VerticalThickness) ? FullSize : lastItem.Bounds.Bottom;
-            this.WidthRequest = lastItem.Bounds.Right < (control.Width - control.Padding.HorizontalThickness) ? FullSize : lastItem.Bounds.Right;
+            newSize = new(lastItem.Bounds.Right < (control.Width - control.Padding.HorizontalThickness) ? FullSize : lastItem.Bounds.Right,
+                lastItem.Bounds.Bottom < (control.Height - control.Padding.VerticalThickness) ? FullSize : lastItem.Bounds.Bottom);
         }
+
+        this.WidthRequest = newSize.Width;
+        this.HeightRequest = newSize.Height;
     }
 
     protected virtual Size GetAvailableSpace()
@@ -813,8 +829,13 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
     {
         if (items.Count == 0 || item.Position < 0 || item.Cell is null) return;
 
+        //AbsoluteLayout.SetLayoutBounds(item.Cell, item.CellBounds);
+#if ANDROID
+        (item.Cell as IView).Arrange(item.CellBounds);
+#else
         item.Cell.TranslationY = item.CellBounds.Y;
         item.Cell.TranslationX = item.CellBounds.X;
+#endif
     }
 
     protected virtual void DrawCachedItem(VirtualizeListViewItem item)
@@ -822,8 +843,14 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
         if (item.Cell is null) return;
 
         // assume there won't be any item bigger than 1000000
-        item.Cell.TranslationY = -(item.Cell.Height + 1000000d);
-        item.Cell.TranslationX = -(item.Cell.Width + 1000000d);
+        var bounds = new Rect(-1000000d, -1000000d, item.Cell.Width, item.Cell.Height);
+
+#if ANDROID
+        (item.Cell as IView).Arrange(bounds);
+#else
+        item.Cell.TranslationY = bounds.Y;
+        item.Cell.TranslationX = bounds.X;
+#endif
     }
 
     protected virtual Thickness GetItemMargin(VirtualizeListViewItem item)
