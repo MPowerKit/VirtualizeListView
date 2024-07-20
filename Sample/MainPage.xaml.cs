@@ -100,4 +100,10 @@ public partial class MainPage
         var source = listView.ItemsSource as ObservableRangeCollection<Item>;
         source.Move(1, 10);
     }
+
+    private void TapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
+    {
+        var item = (sender as View).BindingContext as Item;
+        item.Description += item.Description;
+    }
 }

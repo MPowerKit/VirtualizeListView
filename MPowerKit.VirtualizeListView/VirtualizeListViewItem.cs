@@ -2,9 +2,9 @@
 
 public class VirtualizeListViewItem
 {
-    protected ItemsLayoutManager LayoutManager { get; set; }
+    protected VirtualizeItemsLayoutManger LayoutManager { get; set; }
 
-    public VirtualizeListViewItem(ItemsLayoutManager layoutManager)
+    public VirtualizeListViewItem(VirtualizeItemsLayoutManger layoutManager)
     {
         LayoutManager = layoutManager;
     }
@@ -15,6 +15,7 @@ public class VirtualizeListViewItem
     public virtual bool IsOnScreen => IntersectsWithScrollVisibleRect();
     public bool IsAttached { get; set; }
     public bool IsCached { get; set; }
+    public bool PendingSizeChange { get; set; }
     public DataTemplate Template { get; set; }
     public object BindingContext { get; set; }
     public CellHolder? Cell
@@ -40,7 +41,7 @@ public class VirtualizeListViewItem
 
     public virtual void OnCellSizeChanged()
     {
-        if (IsCached || (Cell?.BindingContext is not null && Cell.BindingContext != BindingContext)) return;
+        if (IsCached || (Cell?.BindingContext is not null && Cell.BindingContext != BindingContext) || PendingSizeChange) return;
 
         LayoutManager?.OnItemSizeChanged(this);
     }

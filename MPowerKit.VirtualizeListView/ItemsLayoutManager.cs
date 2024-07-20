@@ -2,12 +2,89 @@
 using System.Runtime.InteropServices;
 
 using Microsoft.Maui.Controls.Internals;
+using Microsoft.Maui.Layouts;
 
 namespace MPowerKit.VirtualizeListView;
 
-public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
+public class ItemsLayoutManager : LayoutManager
 {
-    protected const double FullSize = -1d;
+    protected VirtualizeItemsLayoutManger Layout { get; }
+
+    public ItemsLayoutManager(VirtualizeItemsLayoutManger virtualizeItemsLayout) : base(virtualizeItemsLayout)
+    {
+        Layout = virtualizeItemsLayout;
+    }
+
+    public override Size Measure(double widthConstraint, double heightConstraint)
+    {
+        var padding = Layout.Padding;
+
+        var availableWidth = widthConstraint - padding.HorizontalThickness;
+        var availableHeight = heightConstraint - padding.VerticalThickness;
+
+        double measuredHeight = 0;
+        double measuredWidth = 0;
+
+        var notCached = CollectionsMarshal.AsSpan(((Layout as IBindableLayout).Children as List<IView>)
+            .FindAll(c => c is CellHolder cellHolder && cellHolder.IsVisible && !cellHolder.Item!.IsCached));
+        var length = notCached.Length;
+
+        for (int n = 0; n < length; n++)
+        {
+            var child = notCached[n];
+            var view = child as CellHolder;
+
+            var bounds = view.Item.CellBounds;
+
+            var measure = child.Measure(double.PositiveInfinity, double.PositiveInfinity);
+
+            measuredWidth = Math.Max(measuredWidth, bounds.Left + measure.Width);
+            measuredHeight = Math.Max(measuredHeight, bounds.Top + measure.Height);
+        }
+
+        var finalWidth = GetFinalLength(Layout.Width, widthConstraint, measuredWidth);
+        var finalHeight = GetFinalLength(Layout.Height, heightConstraint, measuredHeight);
+
+        return new Size(finalWidth, finalHeight);
+    }
+
+    public override Size ArrangeChildren(Rect bounds)
+    {
+        var padding = Layout.Padding;
+
+        var availableWidth = bounds.Width - padding.HorizontalThickness;
+        var availableHeight = bounds.Height - padding.VerticalThickness;
+
+        var items = CollectionsMarshal.AsSpan((Layout as IBindableLayout).Children as List<IView>);
+        var length = items.Length;
+
+        for (int n = 0; n < length; n++)
+        {
+            var child = items[n];
+
+            var view = child as CellHolder;
+
+            var newBounds = new Rect(view.Item.CellBounds.X, view.Item.CellBounds.Y, view.DesiredSize.Width, view.DesiredSize.Height);
+
+            if (!view.IsVisible || view.Bounds == newBounds) continue;
+
+            child.Arrange(newBounds);
+        }
+
+        return new(availableWidth, availableHeight);
+    }
+
+    private double GetFinalLength(double explicitLength, double externalConstraint, double measuredLength)
+    {
+        var length = Math.Min(double.IsNaN(explicitLength) ? measuredLength : explicitLength, externalConstraint);
+
+        return Math.Max(length, 0);
+    }
+}
+
+public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
+{
+    protected const double AutoSize = -1d;
 
     protected ScrollEventArgs PrevScroll { get; set; } = new(0d, 0d, 0d, 0d);
     protected Point PrevScrollBeforeSizeChange { get; set; }
@@ -25,6 +102,11 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
     protected virtual Size AvailableSpace => GetAvailableSpace();
 
     protected bool PendingAdjustScroll { get; set; }
+
+    protected override ILayoutManager CreateLayoutManager()
+    {
+        return new ItemsLayoutManager(this);
+    }
 
     protected override void OnParentChanging(ParentChangingEventArgs args)
     {
@@ -307,15 +389,21 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
 
         var dataItems = Control.Adapter.Items;
 
+        List<VirtualizeListViewItem> newItems = new(e.TotalCount);
+
         for (int index = startingIndex; index < finishIndex; index++)
         {
             var item = CreateItemForPosition(dataItems, index);
 
-            LaidOutItems.Insert(index, item);
+            newItems.Add(item);
+
+            ReuseCell(item);
 
             var estimatedSize = GetEstimatedItemSize(item);
             item.CellBounds = item.Bounds = new(0d, 0d, estimatedSize.Width, estimatedSize.Height);
         }
+
+        LaidOutItems.InsertRange(startingIndex, newItems);
 
         count = LaidOutItems.Count;
         for (int i = finishIndex; i < count; i++)
@@ -359,10 +447,14 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
             throw new ArgumentException("Invalid range");
         }
 
-        for (int i = startingIndex; i < finishIndex; i++)
+        var itemsToRemove = LaidOutItems[startingIndex..finishIndex];
+        LaidOutItems.RemoveRange(startingIndex, e.TotalCount);
+        var nullCells = LaidOutItems.FindAll(i => i.Cell is null);
+        List<VirtualizeListViewItem> cachedItems = new(e.TotalCount);
+
+        for (int i = 0; i < e.TotalCount; i++)
         {
-            var itemToRemove = LaidOutItems[startingIndex];
-            LaidOutItems.RemoveAt(startingIndex);
+            var itemToRemove = itemsToRemove[i];
 
             if (itemToRemove.IsAttached)
             {
@@ -372,13 +464,12 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
 
             if (itemToRemove.Cell is null) continue;
 
-            var itemWithoutCell = LaidOutItems.Find(i =>
-                (i.Template as IDataTemplateController).Id == (itemToRemove.Template as IDataTemplateController).Id
-                && i.Cell is null);
+            var itemWithoutCell = nullCells.Find(i =>
+                (i.Template as IDataTemplateController).Id == (itemToRemove.Template as IDataTemplateController).Id);
             if (itemWithoutCell is null)
             {
-                CachedItems.Add(itemToRemove);
-                DrawCachedItem(itemToRemove);
+                CacheItem(itemToRemove);
+                cachedItems.Add(itemToRemove);
             }
             else
             {
@@ -387,6 +478,8 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
                 itemWithoutCell.Cell = cell;
             }
         }
+
+        DrawCachedItems(cachedItems);
 
         count = LaidOutItems.Count;
         for (int i = startingIndex; i < count; i++)
@@ -460,16 +553,22 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
 
         var dataItems = Control.Adapter.Items;
         var smallestEnd = Math.Min(oldEnd, newEnd);
+        var smallesCount = Math.Min(e.OldCount, e.NewCount);
+        var biggestCount = Math.Max(e.OldCount, e.NewCount);
 
         var itemsToRearrange = LaidOutItems.FindAll(i => i.IsOnScreen && i.IsAttached && (i.Position < start || i.Position >= oldEnd));
         var firstVisibleItem = itemsToRearrange.FirstOrDefault();
         var prevVisibleCellBounds = firstVisibleItem?.CellBounds ?? new();
 
-        for (int i = start; i < smallestEnd; i++)
+        var itemsToRemove = CollectionsMarshal.AsSpan(LaidOutItems[start..oldEnd]);
+        LaidOutItems.RemoveRange(start, oldCount);
+        List<VirtualizeListViewItem> newItems = new(smallesCount);
+        List<VirtualizeListViewItem> cachedItems = new(biggestCount);
+
+        for (int i = 0; i < smallesCount; i++)
         {
             //remove
-            var itemToRemove = LaidOutItems[i];
-            LaidOutItems.RemoveAt(i);
+            var itemToRemove = itemsToRemove[i];
             if (itemToRemove.IsAttached)
             {
                 Control.Adapter.OnCellRecycled(itemToRemove.Cell!, itemToRemove.Position);
@@ -477,8 +576,8 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
             }
 
             //create
-            var item = CreateItemForPosition(dataItems, i);
-            LaidOutItems.Insert(i, item);
+            var item = CreateItemForPosition(dataItems, i + start);
+            newItems.Add(item);
             if (itemToRemove.Cell is not null
                 && (item.Template as IDataTemplateController).Id == (itemToRemove.Template as IDataTemplateController).Id)
             {
@@ -495,46 +594,55 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
             }
 
             //reuse
-            if (itemToRemove.Cell is not null)
+            if (itemToRemove.Cell is null) continue;
+
+            var itemWithoutCell = LaidOutItems.Find(i =>
+                (i.Template as IDataTemplateController).Id == (itemToRemove.Template as IDataTemplateController).Id
+                && i.Cell is null);
+            if (itemWithoutCell is null)
             {
-                var itemWithoutCell = LaidOutItems.Find(i =>
-                    (i.Template as IDataTemplateController).Id == (itemToRemove.Template as IDataTemplateController).Id
-                    && i.Cell is null);
-                if (itemWithoutCell is null)
-                {
-                    CachedItems.Add(itemToRemove);
-                    DrawCachedItem(itemToRemove);
-                }
-                else
-                {
-                    var cell = itemToRemove.Cell;
-                    itemToRemove.Cell = null;
-                    itemWithoutCell.Cell = cell;
-                }
+                CacheItem(itemToRemove);
+                cachedItems.Add(itemToRemove);
+            }
+            else
+            {
+                var cell = itemToRemove.Cell;
+                itemToRemove.Cell = null;
+                itemWithoutCell.Cell = cell;
             }
         }
+
+        LaidOutItems.InsertRange(start, newItems);
 
         if (oldEnd != newEnd)
         {
             if (oldEnd < newEnd)
             {
+                newItems = new(newEnd - smallestEnd);
+
                 for (int i = smallestEnd; i < newEnd; i++)
                 {
                     var item = CreateItemForPosition(dataItems, i);
 
-                    LaidOutItems.Insert(i, item);
+                    newItems.Add(item);
+
+                    ReuseCell(item);
 
                     var estimatedSize = GetEstimatedItemSize(item);
                     item.CellBounds = item.Bounds = new(0d, 0d, estimatedSize.Width, estimatedSize.Height);
                 }
+
+                LaidOutItems.InsertRange(smallestEnd, newItems);
             }
             else
             {
-                for (int i = smallestEnd; i < oldEnd; i++)
-                {
-                    var itemToRemove = LaidOutItems[smallestEnd];
-                    LaidOutItems.RemoveAt(smallestEnd);
+                itemsToRemove = itemsToRemove[smallesCount..];
+                var itemsToRemoveCount = itemsToRemove.Length;
+                var nullCells = LaidOutItems.FindAll(i => i.Cell is null);
 
+                for (int i = 0; i < itemsToRemoveCount; i++)
+                {
+                    var itemToRemove = itemsToRemove[i];
                     if (itemToRemove.IsAttached)
                     {
                         Control.Adapter.OnCellRecycled(itemToRemove.Cell!, itemToRemove.Position);
@@ -543,13 +651,12 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
 
                     if (itemToRemove.Cell is null) continue;
 
-                    var itemWithoutCell = LaidOutItems.Find(i =>
-                        (i.Template as IDataTemplateController).Id == (itemToRemove.Template as IDataTemplateController).Id
-                        && i.Cell is null);
+                    var itemWithoutCell = nullCells.Find(i =>
+                        (i.Template as IDataTemplateController).Id == (itemToRemove.Template as IDataTemplateController).Id);
                     if (itemWithoutCell is null)
                     {
-                        CachedItems.Add(itemToRemove);
-                        DrawCachedItem(itemToRemove);
+                        CacheItem(itemToRemove);
+                        cachedItems.Add(itemToRemove);
                     }
                     else
                     {
@@ -560,6 +667,8 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
                 }
             }
         }
+
+        DrawCachedItems(cachedItems);
 
         count = LaidOutItems.Count;
         for (int i = newEnd; i < count; i++)
@@ -697,7 +806,7 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
 
             if (!onScreen || item.IsAttached) continue;
 
-            ReuseOrCreateCell(item);
+            ReuseCell(item, true);
 
             var prevBounds = item.Bounds;
 
@@ -723,18 +832,31 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
     {
         ResizeLayout();
 
-        foreach (var item in LaidOutItems.FindAll(i => i.Cell is not null))
-        {
-            DrawItem(LaidOutItems, item);
-        }
+        //foreach (var item in LaidOutItems.FindAll(i => i.Cell is not null))
+        //{
+        //    DrawItem(LaidOutItems, item);
+        //}
+        (this as IView).InvalidateMeasure();
     }
 
-    protected virtual void DrawCachedItems()
+    protected virtual void DrawAllCachedItems()
     {
-        foreach (var item in CachedItems)
-        {
-            DrawCachedItem(item);
-        }
+        //foreach (var item in CachedItems)
+        //{
+        //    DrawCachedItem(item);
+        //}
+        (this as IView).InvalidateMeasure();
+        //this.InvalidateMeasure();
+    }
+
+    protected virtual void DrawCachedItems(IReadOnlyCollection<VirtualizeListViewItem> cachedItems)
+    {
+        //foreach (var item in cachedItems)
+        //{
+        //    DrawCachedItem(item);
+        //}
+        (this as IView).InvalidateMeasure();
+        //this.InvalidateMeasure();
     }
 
     protected virtual void CacheItem(VirtualizeListViewItem item)
@@ -743,7 +865,7 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
         CachedItems.Add(item);
     }
 
-    protected virtual void ReuseOrCreateCell(VirtualizeListViewItem item)
+    protected virtual void ReuseCell(VirtualizeListViewItem item, bool createNewIfNoCached = false)
     {
         if (item.Cell is not null) return;
 
@@ -767,7 +889,7 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
                 freeItem.Cell = null;
                 item.Cell = cell;
             }
-            else
+            else if (createNewIfNoCached)
             {
                 item.Cell = Control!.Adapter.OnCreateCell(item.Template, item.Position);
                 this.Add(item.Cell);
@@ -779,8 +901,8 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
     {
         if (LaidOutItems.Count == 0)
         {
-            this.WidthRequest = FullSize;
-            this.HeightRequest = FullSize;
+            this.WidthRequest = AutoSize;
+            this.HeightRequest = AutoSize;
             return;
         }
 
@@ -792,19 +914,21 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
 
         if (IsOrientation(ScrollOrientation.Vertical))
         {
-            newSize = new(FullSize,
-                lastItem.Bounds.Bottom < (control.Height - control.Padding.VerticalThickness) ? FullSize : lastItem.Bounds.Bottom);
+            newSize = new(AutoSize,
+                lastItem.Bounds.Bottom < (control.Height - control.Padding.VerticalThickness) ? AutoSize : lastItem.Bounds.Bottom);
         }
         else if (IsOrientation(ScrollOrientation.Horizontal))
         {
-            newSize = new(lastItem.Bounds.Right < (control.Width - control.Padding.HorizontalThickness) ? FullSize : lastItem.Bounds.Right,
-                FullSize);
+            newSize = new(lastItem.Bounds.Right < (control.Width - control.Padding.HorizontalThickness) ? AutoSize : lastItem.Bounds.Right,
+                AutoSize);
         }
         else
         {
-            newSize = new(lastItem.Bounds.Right < (control.Width - control.Padding.HorizontalThickness) ? FullSize : lastItem.Bounds.Right,
-                lastItem.Bounds.Bottom < (control.Height - control.Padding.VerticalThickness) ? FullSize : lastItem.Bounds.Bottom);
+            newSize = new(lastItem.Bounds.Right < (control.Width - control.Padding.HorizontalThickness) ? AutoSize : lastItem.Bounds.Right,
+                lastItem.Bounds.Bottom < (control.Height - control.Padding.VerticalThickness) ? AutoSize : lastItem.Bounds.Bottom);
         }
+
+        if (this.WidthRequest == newSize.Width && this.HeightRequest == newSize.Height) return;
 
         this.WidthRequest = newSize.Width;
         this.HeightRequest = newSize.Height;
@@ -828,13 +952,15 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
     protected virtual void DrawItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
     {
         if (items.Count == 0 || item.Position < 0 || item.Cell is null) return;
-
         //AbsoluteLayout.SetLayoutBounds(item.Cell, item.CellBounds);
 #if ANDROID
-        (item.Cell as IView).Arrange(item.CellBounds);
+        //item.PendingSizeChange = true;
+        //(item.Cell as IView).Arrange(item.CellBounds);
+        //item.PendingSizeChange = false;
+        //item.Cell.Arrange(item.CellBounds);
 #else
-        item.Cell.TranslationY = item.CellBounds.Y;
-        item.Cell.TranslationX = item.CellBounds.X;
+        //item.Cell.TranslationX = item.CellBounds.X;
+        //item.Cell.TranslationY = item.CellBounds.Y;
 #endif
     }
 
@@ -843,13 +969,18 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
         if (item.Cell is null) return;
 
         // assume there won't be any item bigger than 1000000
-        var bounds = new Rect(-1000000d, -1000000d, item.Cell.Width, item.Cell.Height);
 
+        var coords = -1000000d;
+        //AbsoluteLayout.SetLayoutBounds(item.Cell, new Rect(0, item.CellBounds.Top - 100, item.CellBounds.Width, item.CellBounds.Height));
 #if ANDROID
-        (item.Cell as IView).Arrange(bounds);
+        //item.Cell.Arrange(new Rect(coords, coords, item.CellBounds.Width, item.CellBounds.Height));
+        //item.PendingSizeChange = true;
+        //(item.Cell as IView).Arrange(new Rect(coords, coords, item.CellBounds.Width, item.CellBounds.Height));
+        //item.PendingSizeChange = false;
+
 #else
-        item.Cell.TranslationY = bounds.Y;
-        item.Cell.TranslationX = bounds.X;
+        //item.Cell.TranslationX = coords;
+        //item.Cell.TranslationY = coords;
 #endif
     }
 
@@ -859,7 +990,7 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
     }
 
     protected abstract Size GetEstimatedItemSize(VirtualizeListViewItem item);
-    protected abstract SizeRequest MeasureItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace);
+    protected abstract Size MeasureItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace);
     protected abstract void ArrangeItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace);
     protected abstract void ShiftAllItems(IReadOnlyList<VirtualizeListViewItem> items, int start, int exclusiveEnd);
     protected abstract void ShiftItemsConsecutively(IReadOnlyList<VirtualizeListViewItem> items, int start, int exclusiveEnd);
@@ -888,7 +1019,7 @@ public abstract class ItemsLayoutManager : AbsoluteLayout, IDisposable
         GC.SuppressFinalize(this);
     }
 
-    ~ItemsLayoutManager()
+    ~VirtualizeItemsLayoutManger()
     {
         Dispose(false);
     }

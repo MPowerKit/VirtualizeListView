@@ -216,16 +216,16 @@ public class VirtualizeListView : ScrollView
     #endregion
 
     #region LayoutManager
-    public ItemsLayoutManager LayoutManager
+    public VirtualizeItemsLayoutManger LayoutManager
     {
-        get { return (ItemsLayoutManager)GetValue(LayoutManagerProperty); }
+        get { return (VirtualizeItemsLayoutManger)GetValue(LayoutManagerProperty); }
         protected set { SetValue(LayoutManagerProperty, value); }
     }
 
     public static readonly BindableProperty LayoutManagerProperty =
         BindableProperty.Create(
             nameof(LayoutManager),
-            typeof(ItemsLayoutManager),
+            typeof(VirtualizeItemsLayoutManger),
             typeof(VirtualizeListView));
     #endregion
 
