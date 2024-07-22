@@ -70,9 +70,38 @@ public class GroupableDataAdapter : DataAdapter
         return Control.GroupFooterTemplate;
     }
 
+    public override List<(CellHolder cell, DataTemplate template)> CreateCellsPool(int poolSize)
+    {
+        var result = base.CreateCellsPool(poolSize);
+
+        List<DataTemplate> templates = [];
+
+        if (Control.GroupHeaderTemplate is not null)
+        {
+            templates.AddRange(GetAllTemplatesByTemplate(Control.GroupHeaderTemplate));
+        }
+        if (Control.GroupFooterTemplate is not null)
+        {
+            templates.AddRange(GetAllTemplatesByTemplate(Control.GroupFooterTemplate));
+        }
+
+        for (int i = 0; i < templates.Count; i++)
+        {
+            var template = templates[i];
+
+            for (int j = 0; j < poolSize; j++)
+            {
+                result.Add((CreateEmptyCellForTemplate(template), template));
+            }
+        }
+
+        return result;
+    }
+
     public override CellHolder OnCreateCell(DataTemplate template, int position)
     {
-        var content = template.CreateContent() as View;
+        var holder = CreateEmptyCellForTemplate(template);
+        var content = holder[0];
 
         if (HasHeader && position == 0 && content is VirtualizeListViewCell)
         {
@@ -101,10 +130,6 @@ public class GroupableDataAdapter : DataAdapter
             throw new ArgumentException("ItemTemplate has to be typeof(VirtualizeListViewCell)");
         }
 
-        var holder = new CellHolder()
-        {
-            /*Content =*/ content
-        };
         return holder;
     }
 

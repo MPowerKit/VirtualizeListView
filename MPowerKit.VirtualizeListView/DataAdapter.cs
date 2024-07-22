@@ -141,9 +141,73 @@ public class DataAdapter : IDisposable
         return Control.ItemTemplate;
     }
 
-    public virtual CellHolder OnCreateCell(DataTemplate template, int position)
+    public virtual List<(CellHolder cell, DataTemplate template)> CreateCellsPool(int poolSize)
+    {
+        List<DataTemplate> templates = [];
+        if (Control.HeaderTemplate is not null)
+        {
+            templates.AddRange(GetAllTemplatesByTemplate(Control.HeaderTemplate));
+        }
+        if (Control.FooterTemplate is not null)
+        {
+            templates.AddRange(GetAllTemplatesByTemplate(Control.FooterTemplate));
+        }
+
+        templates.AddRange(GetAllTemplatesByTemplate(Control.ItemTemplate));
+
+        List<(CellHolder cell, DataTemplate template)> result = [];
+
+        for (int i = 0; i < templates.Count; i++)
+        {
+            var template = templates[i];
+
+            for (int j = 0; j < poolSize; j++)
+            {
+                result.Add((CreateEmptyCellForTemplate(template), template));
+            }
+        }
+
+        return result;
+    }
+
+    protected virtual List<DataTemplate> GetAllTemplatesByTemplate(DataTemplate template)
+    {
+        if (template is not DataTemplateSelector selector)
+        {
+            return [template];
+        }
+
+        var templates = selector.GetType().GetProperties();
+        List<DataTemplate> result = new(templates.Length);
+        for (int i = 0; i < templates.Length; i++)
+        {
+            var info = templates[i];
+
+            if (info.PropertyType == typeof(DataTemplate)
+                && info.GetValue(selector) is DataTemplate t
+                && !result.Contains(t))
+            {
+                result.Add(t);
+            }
+        }
+
+        return result;
+    }
+
+    protected virtual CellHolder CreateEmptyCellForTemplate(DataTemplate template)
     {
         var content = template.CreateContent() as View;
+        var holder = new CellHolder()
+        {
+            /*Content =*/ content
+        };
+        return holder;
+    }
+
+    public virtual CellHolder OnCreateCell(DataTemplate template, int position)
+    {
+        var holder = CreateEmptyCellForTemplate(template);
+        var content = holder[0];
 
         if (HasHeader && position == 0 && content is VirtualizeListViewCell)
         {
@@ -160,10 +224,6 @@ public class DataAdapter : IDisposable
             throw new ArgumentException("ItemTemplate has to be typeof(VirtualizeListViewCell)");
         }
 
-        var holder = new CellHolder()
-        {
-            /*Content =*/ content
-        };
         return holder;
     }
 
