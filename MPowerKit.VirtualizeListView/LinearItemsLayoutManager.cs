@@ -52,7 +52,9 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
         var prevIndex = item.Position - 1;
         var prevItemBounds = prevIndex == -1 ? new() : items[prevIndex].Bounds;
 
-        var margin = GetItemMargin(item);
+        var margin = GetItemMargin(items, item);
+
+        item.Margin = margin;
 
         if (IsOrientation(ScrollOrientation.Vertical))
         {
@@ -60,10 +62,14 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
 
             var newAvailableSpace = new Size(availableSpace.Width - margin.HorizontalThickness, availableSpace.Height);
 
-            item.Cell!.WidthRequest = newAvailableSpace.Width;
-            item.Cell.HeightRequest = AutoSize;
-
             var request = MeasureItem(items, item, newAvailableSpace);
+
+            if (item.Cell!.WidthRequest != newAvailableSpace.Width
+                || item.Cell.HeightRequest != AutoSize)
+            {
+                item.Cell!.WidthRequest = newAvailableSpace.Width;
+                item.Cell.HeightRequest = AutoSize;
+            }
 
             item.CellBounds = new Rect(margin.Left, bottom + margin.Top, request.Width, request.Height);
             item.Bounds = new Rect(0d, bottom, request.Width, request.Height + margin.VerticalThickness);
@@ -74,10 +80,14 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
 
             var newAvailableSpace = new Size(availableSpace.Width, availableSpace.Height - margin.VerticalThickness);
 
-            item.Cell!.HeightRequest = newAvailableSpace.Height;
-            item.Cell.WidthRequest = AutoSize;
-
             var request = MeasureItem(items, item, newAvailableSpace);
+
+            if (item.Cell!.WidthRequest != AutoSize
+                || item.Cell.HeightRequest != newAvailableSpace.Height)
+            {
+                item.Cell!.HeightRequest = newAvailableSpace.Height;
+                item.Cell.WidthRequest = AutoSize;
+            }
 
             item.CellBounds = new Rect(right + margin.Left, margin.Top, request.Width, request.Height);
             item.Bounds = new Rect(right, 0d, request.Width + margin.HorizontalThickness, request.Height);
@@ -229,10 +239,10 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
         }
     }
 
-    protected override Thickness GetItemMargin(VirtualizeListViewItem item)
+    protected override Thickness GetItemMargin(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
     {
         if (IsOrientation(ScrollOrientation.Both)
-            || item.Position <= 0) return base.GetItemMargin(item);
+            || item.Position <= 0) return base.GetItemMargin(items, item);
 
         return IsOrientation(ScrollOrientation.Vertical)
             ? new(0d, ItemSpacing, 0d, 0d)

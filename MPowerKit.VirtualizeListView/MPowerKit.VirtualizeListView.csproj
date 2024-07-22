@@ -25,6 +25,10 @@
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>
 
+	<PropertyGroup Condition="$([MSBuild]::IsOSPlatform('windows'))">
+		<DefineConstants>WINDOWS</DefineConstants>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 	</ItemGroup>

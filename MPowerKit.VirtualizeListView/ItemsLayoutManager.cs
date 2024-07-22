@@ -17,35 +17,31 @@ public class ItemsLayoutManager : LayoutManager
 
     public override Size Measure(double widthConstraint, double heightConstraint)
     {
-        var padding = Layout.Padding;
+        var measuredHeight = 0d;
+        var measuredWidth = 0d;
 
-        var availableWidth = widthConstraint - padding.HorizontalThickness;
-        var availableHeight = heightConstraint - padding.VerticalThickness;
-
-        double measuredHeight = 0;
-        double measuredWidth = 0;
-
-        var notCached = CollectionsMarshal.AsSpan(((Layout as IBindableLayout).Children as List<IView>)
-            .FindAll(c => c is CellHolder cellHolder && cellHolder.IsVisible && !cellHolder.Item!.IsCached));
-        var length = notCached.Length;
+        var items = CollectionsMarshal.AsSpan((Layout as IBindableLayout).Children as List<IView>);
+        var length = items.Length;
 
         for (int n = 0; n < length; n++)
         {
-            var child = notCached[n];
+            var child = items[n];
             var view = child as CellHolder;
+
+            if (view.Item!.IsCached || !view.Item.IsAttached) continue;
 
             var bounds = view.Item.CellBounds;
 
             var measure = child.Measure(double.PositiveInfinity, double.PositiveInfinity);
 
-            measuredWidth = Math.Max(measuredWidth, bounds.Left + measure.Width);
-            measuredHeight = Math.Max(measuredHeight, bounds.Top + measure.Height);
+            measuredWidth = Math.Max(measuredWidth, bounds.Left + view.Item.Margin.Right + measure.Width);
+            measuredHeight = Math.Max(measuredHeight, bounds.Top + view.Item.Margin.Bottom + measure.Height);
         }
 
         var finalWidth = GetFinalLength(Layout.Width, widthConstraint, measuredWidth);
         var finalHeight = GetFinalLength(Layout.Height, heightConstraint, measuredHeight);
 
-        return new Size(finalWidth, finalHeight);
+        return new(finalWidth, finalHeight);
     }
 
     public override Size ArrangeChildren(Rect bounds)
@@ -61,12 +57,24 @@ public class ItemsLayoutManager : LayoutManager
         for (int n = 0; n < length; n++)
         {
             var child = items[n];
-
             var view = child as CellHolder;
+#if !ANDROID
+            if (view.Item.IsCached) continue;
+#endif
+            if (!view.Item.IsAttached) continue;
 
-            var newBounds = new Rect(view.Item.CellBounds.X, view.Item.CellBounds.Y, view.DesiredSize.Width, view.DesiredSize.Height);
+            var (x, y) =
+#if !ANDROID
+            (0d, 0d);
+#else
+            (view.Item.CellBounds.X, view.Item.CellBounds.Y);
+#endif
 
-            if (!view.IsVisible || view.Bounds == newBounds) continue;
+            var newBounds = new Rect(x, y, view.DesiredSize.Width, view.DesiredSize.Height);
+
+#if !WINDOWS
+            if (view.Bounds == newBounds) continue;
+#endif
 
             child.Arrange(newBounds);
         }
@@ -102,6 +110,12 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
     protected virtual Size AvailableSpace => GetAvailableSpace();
 
     protected bool PendingAdjustScroll { get; set; }
+
+    protected VirtualizeItemsLayoutManger()
+    {
+        this.HorizontalOptions = LayoutOptions.Start;
+        this.VerticalOptions = LayoutOptions.Start;
+    }
 
     protected override ILayoutManager CreateLayoutManager()
     {
@@ -830,38 +844,49 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
     protected virtual void DrawAndResize()
     {
+#if !ANDROID
+        foreach (var item in LaidOutItems.FindAll(i => i.Cell is not null))
+        {
+            DrawItem(LaidOutItems, item);
+        }
+#endif
+
         ResizeLayout();
 
-        //foreach (var item in LaidOutItems.FindAll(i => i.Cell is not null))
+        // This is commented because it just works somehow without invalidating the measure of the layout
+        //#if ANDROID
+        //if (LaidOutItems.Find(i => i.Cell is not null && i.CellBounds != i.Cell.Bounds) is not null)
         //{
-        //    DrawItem(LaidOutItems, item);
+        //(this as IView).InvalidateMeasure();
         //}
-        (this as IView).InvalidateMeasure();
+        //#endif
     }
 
-    protected virtual void DrawAllCachedItems()
+    protected virtual void DrawCachedItems(List<VirtualizeListViewItem> cachedItems)
     {
-        //foreach (var item in CachedItems)
-        //{
-        //    DrawCachedItem(item);
-        //}
-        (this as IView).InvalidateMeasure();
-        //this.InvalidateMeasure();
-    }
-
-    protected virtual void DrawCachedItems(IReadOnlyCollection<VirtualizeListViewItem> cachedItems)
-    {
-        //foreach (var item in cachedItems)
-        //{
-        //    DrawCachedItem(item);
-        //}
-        (this as IView).InvalidateMeasure();
-        //this.InvalidateMeasure();
+#if !ANDROID
+        foreach (var item in cachedItems)
+        {
+            DrawItem(cachedItems, item);
+        }
+#else
+        if (cachedItems.Find(i => i.CellBounds != i.Cell.Bounds) is not null)
+        {
+            (this as IView).InvalidateMeasure();
+        }
+#endif
     }
 
     protected virtual void CacheItem(VirtualizeListViewItem item)
     {
         item.IsCached = true;
+
+        // assume there won't be any item bigger than 1000000
+        var coords = -1000000d;
+
+        item.CellBounds = new(coords, coords, item.CellBounds.Width, item.CellBounds.Height);
+        item.Bounds = new();
+
         CachedItems.Add(item);
     }
 
@@ -910,23 +935,23 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
         var lastItem = LaidOutItems[^1];
 
-        Size newSize;
+        Size newSize = new(lastItem.Bounds.Right, lastItem.Bounds.Bottom);
 
-        if (IsOrientation(ScrollOrientation.Vertical))
-        {
-            newSize = new(AutoSize,
-                lastItem.Bounds.Bottom < (control.Height - control.Padding.VerticalThickness) ? AutoSize : lastItem.Bounds.Bottom);
-        }
-        else if (IsOrientation(ScrollOrientation.Horizontal))
-        {
-            newSize = new(lastItem.Bounds.Right < (control.Width - control.Padding.HorizontalThickness) ? AutoSize : lastItem.Bounds.Right,
-                AutoSize);
-        }
-        else
-        {
-            newSize = new(lastItem.Bounds.Right < (control.Width - control.Padding.HorizontalThickness) ? AutoSize : lastItem.Bounds.Right,
-                lastItem.Bounds.Bottom < (control.Height - control.Padding.VerticalThickness) ? AutoSize : lastItem.Bounds.Bottom);
-        }
+        //if (IsOrientation(ScrollOrientation.Vertical))
+        //{
+        //    newSize = new(AutoSize,
+        //        lastItem.Bounds.Bottom < (control.Height - control.Padding.VerticalThickness) ? AutoSize : lastItem.Bounds.Bottom);
+        //}
+        //else if (IsOrientation(ScrollOrientation.Horizontal))
+        //{
+        //    newSize = new(lastItem.Bounds.Right < (control.Width - control.Padding.HorizontalThickness) ? AutoSize : lastItem.Bounds.Right,
+        //        AutoSize);
+        //}
+        //else
+        //{
+        //    newSize = new(lastItem.Bounds.Right < (control.Width - control.Padding.HorizontalThickness) ? AutoSize : lastItem.Bounds.Right,
+        //        lastItem.Bounds.Bottom < (control.Height - control.Padding.VerticalThickness) ? AutoSize : lastItem.Bounds.Bottom);
+        //}
 
         if (this.WidthRequest == newSize.Width && this.HeightRequest == newSize.Height) return;
 
@@ -952,39 +977,19 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
     protected virtual void DrawItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
     {
         if (items.Count == 0 || item.Position < 0 || item.Cell is null) return;
-        //AbsoluteLayout.SetLayoutBounds(item.Cell, item.CellBounds);
-#if ANDROID
-        //item.PendingSizeChange = true;
-        //(item.Cell as IView).Arrange(item.CellBounds);
-        //item.PendingSizeChange = false;
-        //item.Cell.Arrange(item.CellBounds);
-#else
-        //item.Cell.TranslationX = item.CellBounds.X;
-        //item.Cell.TranslationY = item.CellBounds.Y;
+
+        var view = item.Cell;
+#if !ANDROID
+        if (view.TranslationX != view.Item.CellBounds.X ||
+            view.TranslationY != view.Item.CellBounds.Y)
+        {
+            view.TranslationX = view.Item.CellBounds.X;
+            view.TranslationY = view.Item.CellBounds.Y;
+        }
 #endif
     }
 
-    protected virtual void DrawCachedItem(VirtualizeListViewItem item)
-    {
-        if (item.Cell is null) return;
-
-        // assume there won't be any item bigger than 1000000
-
-        var coords = -1000000d;
-        //AbsoluteLayout.SetLayoutBounds(item.Cell, new Rect(0, item.CellBounds.Top - 100, item.CellBounds.Width, item.CellBounds.Height));
-#if ANDROID
-        //item.Cell.Arrange(new Rect(coords, coords, item.CellBounds.Width, item.CellBounds.Height));
-        //item.PendingSizeChange = true;
-        //(item.Cell as IView).Arrange(new Rect(coords, coords, item.CellBounds.Width, item.CellBounds.Height));
-        //item.PendingSizeChange = false;
-
-#else
-        //item.Cell.TranslationX = coords;
-        //item.Cell.TranslationY = coords;
-#endif
-    }
-
-    protected virtual Thickness GetItemMargin(VirtualizeListViewItem item)
+    protected virtual Thickness GetItemMargin(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
     {
         return new Thickness();
     }

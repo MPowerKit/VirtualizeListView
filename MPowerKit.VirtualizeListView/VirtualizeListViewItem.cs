@@ -38,6 +38,7 @@ public class VirtualizeListViewItem
     }
     public Rect CellBounds { get; set; }
     public Rect Bounds { get; set; }
+    public Thickness Margin { get; set; }
 
     public virtual void OnCellSizeChanged()
     {
