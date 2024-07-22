@@ -56,17 +56,17 @@ public class ItemsLayoutManager : LayoutManager
         {
             var child = items[n];
             var view = child as CellHolder;
-#if !ANDROID
+#if WINDOWS
             if (view.Item.IsCached || !view.Item.IsAttached) continue;
-#else
+#elif ANDROID
             if (!view.Item.IsCached && !view.Item.IsAttached) continue;
 #endif
 
             var (x, y) =
-#if !ANDROID
-            (0d, 0d);
+#if ANDROID
+                (view.Item.CellBounds.X, view.Item.CellBounds.Y);
 #else
-            (view.Item.CellBounds.X, view.Item.CellBounds.Y);
+                (0d, 0d);
 #endif
 
             var newBounds = new Rect(x, y, view.DesiredSize.Width, view.DesiredSize.Height);

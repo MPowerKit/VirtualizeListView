@@ -9,6 +9,7 @@ namespace MPowerKit.VirtualizeListView;
 public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 {
     protected const double AutoSize = -1d;
+    protected const double CachedItemsCoords = -1000000d;
     public int PoolSize { get; set; }
     protected ScrollEventArgs PrevScroll { get; set; } = new(0d, 0d, 0d, 0d);
     protected Point PrevScrollBeforeSizeChange { get; set; }
@@ -255,11 +256,16 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         for (int i = 0; i < pool.Count; i++)
         {
             var (cell, template) = pool[i];
-
             this.Add(cell);
 
-            CacheItem(CreateDummyItem(template, cell));
+            var item = CreateDummyItem(template, cell);
+
+            CacheItem(item);
         }
+
+#if !ANDROID
+        DrawCachedItems(CachedItems);
+#endif
     }
 
     protected virtual void RelayoutItems()
@@ -743,7 +749,6 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         for (int i = fromPosition; i < count; i++)
         {
             var item = spanList[i];
-
             var onScreen = item.IsOnScreen;
 
             if (!onScreen && item.IsAttached)
@@ -815,10 +820,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
     {
         item.IsCached = true;
 
-        // assume there won't be any item bigger than 1000000
-        var coords = -1000000d;
-
-        item.CellBounds = new(coords, coords, item.CellBounds.Width, item.CellBounds.Height);
+        item.CellBounds = new(CachedItemsCoords, CachedItemsCoords, item.CellBounds.Width, item.CellBounds.Height);
         item.Bounds = new();
 
         CachedItems.Add(item);
@@ -913,11 +915,18 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         var item = new VirtualizeListViewItem(this)
         {
             Template = template,
-            Cell = cell
+            Cell = cell,
+            Position = 0
         };
 
-        var size = GetEstimatedItemSize(item);
-        item.CellBounds = new(0d, 0d, size.Width, size.Height);
+        var size =
+#if IOS
+            (cell as IView).Measure(double.PositiveInfinity, double.PositiveInfinity);
+#else
+            GetEstimatedItemSize(item);
+#endif
+
+        item.CellBounds = item.Bounds = new(0d, 0d, size.Width, size.Height);
 
         return item;
     }
