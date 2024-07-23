@@ -2,12 +2,12 @@
 
 public interface IItemsLayout
 {
-    int PoolSize { get; set; }
+    int InitialCachePoolSize { get; set; }
 }
 
 public class ItemsLayout : IItemsLayout
 {
-    public int PoolSize { get; set; } = 4;
+    public int InitialCachePoolSize { get; set; } = 4;
 }
 
 public class LinearLayout : ItemsLayout

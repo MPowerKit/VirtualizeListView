@@ -149,7 +149,7 @@ public class VirtualizeListView : ScrollView
             LayoutManager = new LinearItemsLayoutManager()
             {
                 ItemSpacing = linearLayout.ItemSpacing,
-                CachePoolSize = linearLayout.PoolSize,
+                CachePoolSize = linearLayout.InitialCachePoolSize,
                 BindingContext = null
             };
         }
