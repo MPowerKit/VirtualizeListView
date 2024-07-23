@@ -71,8 +71,8 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
                 item.Cell.HeightRequest = AutoSize;
             }
 
-            item.CellBounds = new Rect(margin.Left, bottom + margin.Top, request.Width, request.Height);
-            item.Bounds = new Rect(0d, bottom, request.Width, request.Height + margin.VerticalThickness);
+            item.CellBounds = new Rect(margin.Left, bottom + margin.Top, newAvailableSpace.Width, request.Height);
+            item.Bounds = new Rect(0d, bottom, newAvailableSpace.Width, request.Height + margin.VerticalThickness);
         }
         else
         {
@@ -89,8 +89,8 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
                 item.Cell.WidthRequest = AutoSize;
             }
 
-            item.CellBounds = new Rect(right + margin.Left, margin.Top, request.Width, request.Height);
-            item.Bounds = new Rect(right, 0d, request.Width + margin.HorizontalThickness, request.Height);
+            item.CellBounds = new Rect(right + margin.Left, margin.Top, request.Width, newAvailableSpace.Height);
+            item.Bounds = new Rect(right, 0d, request.Width + margin.HorizontalThickness, newAvailableSpace.Height);
         }
     }
 

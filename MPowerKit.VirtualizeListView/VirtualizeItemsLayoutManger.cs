@@ -20,7 +20,9 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
     public bool IsDisposed { get; protected set; }
 
     protected List<VirtualizeListViewItem> LaidOutItems { get; } = [];
-    protected List<VirtualizeListViewItem> CachedItems { get; } = [];
+    public IReadOnlyList<VirtualizeListViewItem> ReadOnlyLaidOutItems => LaidOutItems;
+    //protected List<VirtualizeListViewItem> CachedItems { get; } = [];
+    protected List<(DataTemplate Template, CellHolder Cell)> CachedItems { get; } = [];
 
     public List<(object Data, int Position)> VisibleItems => LaidOutItems.FindAll(i => i.IsOnScreen && i.IsAttached && i.Cell?.Children[0] is VirtualizeListViewCell).Select(i => (i.BindingContext, i.Position)).ToList();
 
@@ -30,8 +32,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
     protected VirtualizeItemsLayoutManger()
     {
-        this.HorizontalOptions = LayoutOptions.Start;
-        this.VerticalOptions = LayoutOptions.Start;
+        //this.HorizontalOptions = LayoutOptions.Start;
+        //this.VerticalOptions = LayoutOptions.Start;
     }
 
     protected override ILayoutManager CreateLayoutManager()
@@ -225,15 +227,11 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
             LaidOutItems.Add(item);
 
-            var estimatedSize = GetEstimatedItemSize(item);
-            item.CellBounds = item.Bounds = new(0d, 0d, estimatedSize.Width, estimatedSize.Height);
-
             ShiftAllItems(LaidOutItems, i, LaidOutItems.Count);
 
             if (!item.IsOnScreen) continue;
 
-            item.Cell = Control.Adapter.OnCreateCell(item.Template, item.Position);
-            this.Add(item.Cell);
+            ReuseCell(item, true);
 
             Control.Adapter.OnBindCell(item.Cell, item.Position);
 
@@ -263,9 +261,9 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
             CacheItem(item);
         }
 
-#if !ANDROID
-        DrawCachedItems(CachedItems);
-#endif
+        //#if !ANDROID
+        //        DrawCachedItems(CachedItems);
+        //#endif
     }
 
     protected virtual void RelayoutItems()
@@ -351,10 +349,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
             newItems.Add(item);
 
-            ReuseCell(item);
-
-            var estimatedSize = GetEstimatedItemSize(item);
-            item.CellBounds = item.Bounds = new(0d, 0d, estimatedSize.Width, estimatedSize.Height);
+            ReuseCell(item, false);
         }
 
         LaidOutItems.InsertRange(startingIndex, newItems);
@@ -414,6 +409,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
             {
                 Control!.Adapter.OnCellRecycled(itemToRemove.Cell!, itemToRemove.Position);
                 itemToRemove.IsAttached = false;
+
+                CacheItem(itemToRemove);
             }
 
             if (itemToRemove.Cell is null) continue;
@@ -541,11 +538,6 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
                 item.Bounds = itemToRemove.Bounds;
                 item.CellBounds = itemToRemove.CellBounds;
             }
-            else
-            {
-                var estimatedSize = GetEstimatedItemSize(item);
-                item.CellBounds = item.Bounds = new(0d, 0d, estimatedSize.Width, estimatedSize.Height);
-            }
 
             //reuse
             if (itemToRemove.Cell is null) continue;
@@ -580,10 +572,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
                     newItems.Add(item);
 
-                    ReuseCell(item);
-
-                    var estimatedSize = GetEstimatedItemSize(item);
-                    item.CellBounds = item.Bounds = new(0d, 0d, estimatedSize.Width, estimatedSize.Height);
+                    ReuseCell(item, false);
                 }
 
                 LaidOutItems.InsertRange(smallestEnd, newItems);
@@ -755,11 +744,23 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
             {
                 control.Adapter.OnCellRecycled(item.Cell!, item.Position);
                 item.IsAttached = false;
+
+                CacheItem(item);
             }
+        }
+
+        bool reused = false;
+
+        for (int i = fromPosition; i < count; i++)
+        {
+            var item = spanList[i];
+            var onScreen = item.IsOnScreen;
 
             if (!onScreen || item.IsAttached) continue;
 
             ReuseCell(item, true);
+
+            reused = true;
 
             var prevBounds = item.Bounds;
 
@@ -779,6 +780,10 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         }
 
         DrawAndResize();
+
+#if ANDROID
+        if (reused) (this as IView).InvalidateMeasure();
+#endif
     }
 
     protected virtual void DrawAndResize()
@@ -792,41 +797,47 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
         ResizeLayout();
 
-        // This is commented because it just works somehow without invalidating the measure of the layout
+        //This is commented because it just works somehow without invalidating the measure of the layout
         //#if ANDROID
-        //if (LaidOutItems.Find(i => i.Cell is not null && i.CellBounds != i.Cell.Bounds) is not null)
-        //{
-        //(this as IView).InvalidateMeasure();
-        //}
+        //        if (LaidOutItems.Find(i => i.Cell is not null && i.CellBounds != i.Cell.Bounds) is not null)
+        //        {
+        //        (this as IView).InvalidateMeasure();
+        //        }
         //#endif
     }
 
     protected virtual void DrawCachedItems(List<VirtualizeListViewItem> cachedItems)
     {
 #if !ANDROID
-        foreach (var item in cachedItems)
-        {
-            DrawItem(cachedItems, item);
-        }
+        //foreach (var item in cachedItems)
+        //{
+        //    DrawItem(cachedItems, item);
+        //}
 #else
-        if (cachedItems.Find(i => i.CellBounds != i.Cell.Bounds) is not null)
-        {
-            (this as IView).InvalidateMeasure();
-        }
+        //if (cachedItems.Find(i => i.CellBounds != i.Cell.Bounds) is not null)
+        //{
+        //    (this as IView).InvalidateMeasure();
+        //}
 #endif
     }
 
     protected virtual void CacheItem(VirtualizeListViewItem item)
     {
-        item.IsCached = true;
+        //item.IsCached = true;
 
-        item.CellBounds = new(CachedItemsCoords, CachedItemsCoords, item.CellBounds.Width, item.CellBounds.Height);
-        item.Bounds = new();
+        //item.CellBounds = new(CachedItemsCoords, CachedItemsCoords, item.CellBounds.Width, item.CellBounds.Height);
+        //item.Bounds = new();
 
-        CachedItems.Add(item);
+        var cell = item.Cell;
+
+        cell.TranslationX = CachedItemsCoords;
+        cell.TranslationY = CachedItemsCoords;
+
+        CachedItems.Add((item.Template, cell));
+        item.Cell = null;
     }
 
-    protected virtual void ReuseCell(VirtualizeListViewItem item, bool createNewIfNoCached = false)
+    protected virtual void ReuseCell(VirtualizeListViewItem item, bool createNewIfNoCached)
     {
         if (item.Cell is not null) return;
 
@@ -841,14 +852,21 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         }
         else
         {
-            freeItem = CachedItems.Find(i => (i.Template as IDataTemplateController).Id == (item.Template as IDataTemplateController).Id);
-            if (freeItem is not null)
+            var freeCell = CachedItems.Find(i => (i.Template as IDataTemplateController).Id == (item.Template as IDataTemplateController).Id);
+            if (freeCell != default)
             {
-                CachedItems.Remove(freeItem);
+                CachedItems.Remove(freeCell);
 
-                var cell = freeItem.Cell;
-                freeItem.Cell = null;
+                //var cell = freeItem.Cell;
+                //freeItem.Cell = null;
+
+                var cell = freeCell.Cell;
+
                 item.Cell = cell;
+#if ANDROID
+                cell.TranslationX = 0d;
+                cell.TranslationY = 0d;
+#endif
             }
             else if (createNewIfNoCached)
             {
@@ -867,11 +885,19 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
             return;
         }
 
-        var control = Control!;
+        //var control = Control!;
 
         var lastItem = LaidOutItems[^1];
 
         Size newSize = new(lastItem.Bounds.Right, lastItem.Bounds.Bottom);
+
+        if (PrevContentSize == newSize) return;
+
+        PrevContentSize = newSize;
+
+        (this as IView).InvalidateMeasure();
+
+        //Size newSize;
 
         //if (IsOrientation(ScrollOrientation.Vertical))
         //{
@@ -889,10 +915,10 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         //        lastItem.Bounds.Bottom < (control.Height - control.Padding.VerticalThickness) ? AutoSize : lastItem.Bounds.Bottom);
         //}
 
-        if (this.WidthRequest == newSize.Width && this.HeightRequest == newSize.Height) return;
+        //if (this.WidthRequest == newSize.Width && this.HeightRequest == newSize.Height) return;
 
-        this.WidthRequest = newSize.Width;
-        this.HeightRequest = newSize.Height;
+        //this.WidthRequest = newSize.Width;
+        //this.HeightRequest = newSize.Height;
     }
 
     protected virtual Size GetAvailableSpace()
@@ -902,12 +928,17 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
     protected virtual VirtualizeListViewItem CreateItemForPosition(IReadOnlyList<object> dataItems, int position)
     {
-        return new VirtualizeListViewItem(this)
+        var item = new VirtualizeListViewItem(this)
         {
             BindingContext = dataItems[position],
             Template = Control!.Adapter.GetTemplate(position),
             Position = position
         };
+
+        var estimatedSize = GetEstimatedItemSize(item);
+        item.CellBounds = item.Bounds = new(0d, 0d, estimatedSize.Width, estimatedSize.Height);
+
+        return item;
     }
 
     protected virtual VirtualizeListViewItem CreateDummyItem(DataTemplate template, CellHolder cell)
@@ -919,14 +950,14 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
             Position = 0
         };
 
-        var size =
-#if IOS
-            (cell as IView).Measure(double.PositiveInfinity, double.PositiveInfinity);
-#else
-            GetEstimatedItemSize(item);
-#endif
+        //        var size =
+        //#if IOS
+        //            (cell as IView).Measure(double.PositiveInfinity, double.PositiveInfinity);
+        //#else
+        //            GetEstimatedItemSize(item);
+        //#endif
 
-        item.CellBounds = item.Bounds = new(0d, 0d, size.Width, size.Height);
+        //        item.CellBounds = item.Bounds = new(0d, 0d, size.Width, size.Height);
 
         return item;
     }

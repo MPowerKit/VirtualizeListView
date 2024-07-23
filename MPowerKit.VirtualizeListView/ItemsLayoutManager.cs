@@ -18,6 +18,14 @@ public class ItemsLayoutManager : LayoutManager
         var measuredHeight = 0d;
         var measuredWidth = 0d;
 
+        Size newSize = new();
+        if (Layout.ReadOnlyLaidOutItems.Count > 0)
+        {
+            var lastItem = Layout.ReadOnlyLaidOutItems[^1];
+
+            newSize = new(lastItem.Bounds.Right, lastItem.Bounds.Bottom);
+        }
+
         var items = CollectionsMarshal.AsSpan((Layout as IBindableLayout).Children as List<IView>);
         var length = items.Length;
 
@@ -26,20 +34,25 @@ public class ItemsLayoutManager : LayoutManager
             var child = items[n];
             var view = child as CellHolder;
 
-            if (view.Item!.IsCached || !view.Item.IsAttached) continue;
+            if (/*view.Item!.IsCached ||*/ view.IsCached || !view.Item.IsAttached) continue;
 
-            var bounds = view.Item.CellBounds;
+            //var bounds = view.Item.CellBounds;
 
             var measure = child.Measure(double.PositiveInfinity, double.PositiveInfinity);
 
-            measuredWidth = Math.Max(measuredWidth, bounds.Left + view.Item.Margin.Right + measure.Width);
-            measuredHeight = Math.Max(measuredHeight, bounds.Top + view.Item.Margin.Bottom + measure.Height);
+            //measuredWidth = Math.Max(measuredWidth, bounds.Left + view.Item.Margin.Right + measure.Width);
+            //measuredHeight = Math.Max(measuredHeight, bounds.Top + view.Item.Margin.Bottom + measure.Height);
         }
 
-        var finalWidth = GetFinalLength(Layout.Width, widthConstraint, measuredWidth);
-        var finalHeight = GetFinalLength(Layout.Height, heightConstraint, measuredHeight);
+        //var finalWidth = GetFinalLength(Layout.Width, widthConstraint, measuredWidth);
+        //var finalHeight = GetFinalLength(Layout.Height, heightConstraint, measuredHeight);
 
-        return new(finalWidth, finalHeight);
+        //var finalWidth = GetFinalLength(newSize.Width, widthConstraint, measuredWidth);
+        //var finalHeight = GetFinalLength(newSize.Height, heightConstraint, measuredHeight);
+
+        //return new(finalWidth, finalHeight);
+
+        return newSize;
     }
 
     public override Size ArrangeChildren(Rect bounds)
@@ -57,9 +70,9 @@ public class ItemsLayoutManager : LayoutManager
             var child = items[n];
             var view = child as CellHolder;
 #if WINDOWS
-            if (view.Item.IsCached || !view.Item.IsAttached) continue;
+            if (/*view.Item.IsCached ||*/ view.IsCached || !view.Item.IsAttached) continue;
 #elif ANDROID
-            if (!view.Item.IsCached && !view.Item.IsAttached) continue;
+            if (/*!view.Item.IsCached &&*/ view.IsCached || !view.Item.IsAttached) continue;
 #endif
 
             var (x, y) =

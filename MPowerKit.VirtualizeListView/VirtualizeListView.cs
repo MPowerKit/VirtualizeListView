@@ -186,8 +186,15 @@ public class VirtualizeListView : ScrollView
     {
         AdjustScrollRequested?.Invoke(this, (dx, dy));
 
-#if !ANDROID
-        ScrollToAsync(ScrollX + dx, ScrollY + dy, false);
+#if IOS || MACCATALYST
+        var scroll = (this.Handler?.PlatformView as UIKit.UIScrollView);
+        scroll?.SetContentOffset(new(ScrollX + dx, ScrollY + dy), false);
+#elif WINDOWS
+        var scroll = (this.Handler?.PlatformView as dynamic);
+        scroll?.ChangeView(ScrollX + dx, ScrollY + dy, null, true);
+#else
+        var scroll = (this.Handler?.PlatformView as SmoothScrollView);
+        scroll?.AdjustScroll(dx, dy);
 #endif
     }
 
@@ -416,5 +423,20 @@ public class VirtualizeListView : ScrollView
             nameof(GroupFooterTemplate),
             typeof(DataTemplate),
             typeof(VirtualizeListView));
+    #endregion
+
+    #region ScrollSpeed
+    public ScrollSpeed ScrollSpeed
+    {
+        get { return (ScrollSpeed)GetValue(ScrollSpeedProperty); }
+        set { SetValue(ScrollSpeedProperty, value); }
+    }
+
+    public static readonly BindableProperty ScrollSpeedProperty =
+        BindableProperty.Create(
+            nameof(ScrollSpeed),
+            typeof(ScrollSpeed),
+            typeof(VirtualizeListView),
+            ScrollSpeed.Normal);
     #endregion
 }

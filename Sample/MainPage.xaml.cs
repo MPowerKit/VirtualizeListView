@@ -14,6 +14,8 @@ public partial class Item : ObservableObject
     private string _title;
     [ObservableProperty]
     private string _description;
+    [ObservableProperty]
+    private double _height;
 }
 
 public partial class MainPage
@@ -22,7 +24,7 @@ public partial class MainPage
     {
         InitializeComponent();
 
-        FillItems();
+        //FillItems();
     }
 
     private void FillItems()
@@ -105,5 +107,27 @@ public partial class MainPage
     {
         var item = (sender as View).BindingContext as Item;
         item.Description += item.Description;
+    }
+
+    private readonly Random _rnd = new();
+    private readonly Random _heightRnd = new();
+
+    private void Entry_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        var items = new List<Item>();
+        if (!string.IsNullOrWhiteSpace(e.NewTextValue))
+        {
+            var count = _rnd.Next(10, 50);
+            for (var i = 0; i < count; i++)
+                items.Add(new Item
+                {
+                    Title = $"Item #{i}",
+                    Description = e.NewTextValue,
+                    Height = _heightRnd.Next(50, 100),
+                    Image = "https://picsum.photos/600"
+                });
+        }
+
+        listView.ItemsSource = items;
     }
 }

@@ -5,8 +5,10 @@
              xmlns:local="clr-namespace:Sample"
              xmlns:mpowerkit="clr-namespace:MPowerKit.VirtualizeListView;assembly=MPowerKit.VirtualizeListView">
 
-    <Grid RowDefinitions="50,*">
-        <Grid ColumnDefinitions="*,*,*,*"
+    <Grid RowDefinitions="Auto,50,*">
+        <Entry TextChanged="Entry_TextChanged" />
+        <Grid Grid.Row="1"
+              ColumnDefinitions="*,*,*,*"
               ColumnSpacing="15">
             <Button Clicked="Button_Clicked_Add"
                     Text="Add" />
@@ -24,7 +26,7 @@
         <!--<mpowerkit:FixedRefreshView Grid.Row="1"
                                     Refreshing="FixedRefreshView_Refreshing">-->
         <mpowerkit:VirtualizeListView x:Name="listView"
-                                      Grid.Row="1"
+                                      Grid.Row="2"
                                       Padding="15"
                                       IsGrouped="False">
             <mpowerkit:VirtualizeListView.ItemsLayout>
@@ -40,16 +42,18 @@
                 </mpowerkit:VirtualizeListView.GroupHeaderTemplate>-->
             <mpowerkit:VirtualizeListView.ItemTemplate>
                 <DataTemplate x:DataType="local:Item">
-                    <mpowerkit:VirtualizeListViewCell BackgroundColor="Red">
-                        <Grid ColumnDefinitions="70,*"
+                    <mpowerkit:VirtualizeListViewCell>
+                        <Grid ColumnDefinitions="Auto,*"
                               ColumnSpacing="15"
-                              RowDefinitions="70,*"
+                              RowDefinitions="Auto,*"
                               RowSpacing="10">
                             <Grid.GestureRecognizers>
                                 <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped" />
                             </Grid.GestureRecognizers>
                             <Image Aspect="AspectFill"
-                                   Source="{Binding Image}" />
+                                   HeightRequest="{Binding Height}"
+                                   Source="{Binding Image}"
+                                   WidthRequest="{Binding Height}" />
                             <StackLayout Grid.Column="1"
                                          VerticalOptions="Center">
                                 <Label FontAttributes="Bold"
