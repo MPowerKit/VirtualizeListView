@@ -26,6 +26,13 @@ public class VirtualizeListView : ScrollView
         OnItemsLayoutSet();
     }
 
+    protected override void OnHandlerChanged()
+    {
+        base.OnHandlerChanged();
+
+        ChangeScrollSpeed();
+    }
+
     protected override void OnPropertyChanging([CallerMemberName] string? propertyName = null)
     {
         base.OnPropertyChanging(propertyName);
@@ -69,7 +76,11 @@ public class VirtualizeListView : ScrollView
         {
             LayoutManager?.InvalidateLayout();
         }
-#if IOS
+        else if (propertyName == ScrollSpeedProperty.PropertyName)
+        {
+            ChangeScrollSpeed();
+        }
+#if MACIOS
         else if (propertyName == ContentSizeProperty.PropertyName)
         {
             InvalidateMeasure();
@@ -111,6 +122,18 @@ public class VirtualizeListView : ScrollView
         }
     }
 
+    protected virtual void ChangeScrollSpeed()
+    {
+        if (Handler is null) return;
+
+#if MACIOS
+        var scroll = this.Handler?.PlatformView as UIKit.UIScrollView;
+        scroll.DecelerationRate = ScrollSpeed is ScrollSpeed.Normal
+            ? UIKit.UIScrollView.DecelerationRateFast
+            : UIKit.UIScrollView.DecelerationRateNormal;
+#endif
+    }
+
     private void Refresh_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == RefreshView.IsRefreshingProperty.PropertyName)
@@ -123,7 +146,12 @@ public class VirtualizeListView : ScrollView
     {
         if (ItemsLayout is LinearLayout linearLayout)
         {
-            LayoutManager = new LinearItemsLayoutManager() { ItemSpacing = linearLayout.ItemSpacing };
+            LayoutManager = new LinearItemsLayoutManager()
+            {
+                ItemSpacing = linearLayout.ItemSpacing,
+                CachePoolSize = linearLayout.InitialCachePoolSize,
+                BindingContext = null
+            };
         }
     }
 
@@ -181,8 +209,15 @@ public class VirtualizeListView : ScrollView
     {
         AdjustScrollRequested?.Invoke(this, (dx, dy));
 
-#if !ANDROID
-        ScrollToAsync(ScrollX + dx, ScrollY + dy, false);
+#if MACIOS
+        var scroll = this.Handler?.PlatformView as UIKit.UIScrollView;
+        scroll?.SetContentOffset(new(ScrollX + dx, ScrollY + dy), false);
+#elif WINDOWS
+        var scroll = this.Handler?.PlatformView as Microsoft.UI.Xaml.Controls.ScrollViewer;
+        scroll?.ChangeView(ScrollX + dx, ScrollY + dy, null, true);
+#else
+        var scroll = this.Handler?.PlatformView as SmoothScrollView;
+        scroll?.AdjustScroll(dx, dy);
 #endif
     }
 
@@ -216,16 +251,16 @@ public class VirtualizeListView : ScrollView
     #endregion
 
     #region LayoutManager
-    public ItemsLayoutManager LayoutManager
+    public VirtualizeItemsLayoutManger LayoutManager
     {
-        get { return (ItemsLayoutManager)GetValue(LayoutManagerProperty); }
+        get { return (VirtualizeItemsLayoutManger)GetValue(LayoutManagerProperty); }
         protected set { SetValue(LayoutManagerProperty, value); }
     }
 
     public static readonly BindableProperty LayoutManagerProperty =
         BindableProperty.Create(
             nameof(LayoutManager),
-            typeof(ItemsLayoutManager),
+            typeof(VirtualizeItemsLayoutManger),
             typeof(VirtualizeListView));
     #endregion
 
@@ -411,5 +446,20 @@ public class VirtualizeListView : ScrollView
             nameof(GroupFooterTemplate),
             typeof(DataTemplate),
             typeof(VirtualizeListView));
+    #endregion
+
+    #region ScrollSpeed
+    public ScrollSpeed ScrollSpeed
+    {
+        get { return (ScrollSpeed)GetValue(ScrollSpeedProperty); }
+        set { SetValue(ScrollSpeedProperty, value); }
+    }
+
+    public static readonly BindableProperty ScrollSpeedProperty =
+        BindableProperty.Create(
+            nameof(ScrollSpeed),
+            typeof(ScrollSpeed),
+            typeof(VirtualizeListView),
+            ScrollSpeed.Normal);
     #endregion
 }

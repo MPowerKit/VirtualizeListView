@@ -10,6 +10,18 @@ public class FixedRefreshView : RefreshView
     protected bool PrevEnabled { get; set; }
     protected bool PrevPullRefreshEnabled { get; set; }
 
+    public FixedRefreshView()
+    {
+#if ANDROID
+        this.SizeChanged += FixedRefreshView_SizeChanged;
+#endif
+    }
+
+    private void FixedRefreshView_SizeChanged(object? sender, EventArgs e)
+    {
+        Content?.Layout(new Rect(0, 0, Width - Padding.HorizontalThickness, Height - Padding.VerticalThickness));
+    }
+
     protected virtual void Refresh()
     {
         Refreshing?.Invoke(this, EventArgs.Empty);
@@ -30,7 +42,6 @@ public class FixedRefreshView : RefreshView
         {
             PrevPullRefreshEnabled = IsPullToRefreshEnabled;
             IsPullToRefreshEnabled = false;
-
             PrevEnabled = IsEnabled;
             IsEnabled = false;
         }

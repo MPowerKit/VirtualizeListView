@@ -7,10 +7,10 @@ public static class BuilderExtensions
         builder.ConfigureMauiHandlers(handlers =>
         {
 #if ANDROID
-            handlers.AddHandler<VirtualizeListView, VirtualizeListViewRenderer>();
+            handlers.AddHandler<VirtualizeListView, VirtualizeListViewHandler>();
 #endif
 
-#if ANDROID || IOS
+#if !WINDOWS
             handlers.AddHandler<FixedRefreshView, FixedRefreshViewRenderer>();
 #endif
         });

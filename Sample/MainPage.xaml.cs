@@ -14,6 +14,8 @@ public partial class Item : ObservableObject
     private string _title;
     [ObservableProperty]
     private string _description;
+    [ObservableProperty]
+    private double _height;
 }
 
 public partial class MainPage
@@ -28,14 +30,15 @@ public partial class MainPage
     private void FillItems()
     {
         var items = new ObservableRangeCollection<Item>();
-        for (int i = 0; i < 500; i++)
+        for (int i = 0; i < 50; i++)
         {
             items.Add(new Item()
             {
                 Id = i,
                 Title = $"This is title for {i}",
                 Description = $"This is the long description for {i}, alsdnhkjadfng askdsn kdag ndfnb ksdfhk adfkj ndkfg akfn bkjdfng kjdfhg kjadfnkjandf kgjankgj",
-                //Image = $"https://picsum.photos/id/{i}/300/200"
+                Image = "https://picsum.photos/600",
+                Height = 50
             });
         }
 
@@ -63,7 +66,8 @@ public partial class MainPage
                 Id = i + 500,
                 Title = $"This is title for {i + 500}",
                 Description = $"This is the long description for {i + 500}, alsdnhkjadfng askdsn kdag ndfnb ksdfhk adfkj ndkfg akfn bkjdfng kjdfhg kjadfnkjandf kgjankgj",
-                Image = $"https://picsum.photos/id/{i + 500}/300/200"
+                Image = "https://picsum.photos/600",
+                Height = 50
             });
         }
 
@@ -88,7 +92,8 @@ public partial class MainPage
                 Id = i + 500,
                 Title = $"This is title for {i + 500}",
                 Description = $"This is the long description for {i + 500}, alsdnhkjadfng askdsn kdag ndfnb ksdfhk adfkj ndkfg akfn bkjdfng kjdfhg kjadfnkjandf kgjankgj",
-                Image = $"https://picsum.photos/id/{i + 500}/300/200"
+                Image = "https://picsum.photos/600",
+                Height = 50
             });
         }
 
@@ -99,5 +104,33 @@ public partial class MainPage
     {
         var source = listView.ItemsSource as ObservableRangeCollection<Item>;
         source.Move(1, 10);
+    }
+
+    private void TapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
+    {
+        var item = (sender as View).BindingContext as Item;
+        item.Description += item.Description;
+    }
+
+    private readonly Random _rnd = new();
+    private readonly Random _heightRnd = new();
+
+    private void Entry_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        var items = new ObservableRangeCollection<Item>();
+        if (!string.IsNullOrWhiteSpace(e.NewTextValue))
+        {
+            var count = _rnd.Next(10, 50);
+            for (var i = 0; i < count; i++)
+                items.Add(new Item
+                {
+                    Title = $"Item #{i}",
+                    Description = e.NewTextValue,
+                    Height = _heightRnd.Next(50, 100),
+                    Image = "https://picsum.photos/600"
+                });
+        }
+
+        listView.ItemsSource = items;
     }
 }

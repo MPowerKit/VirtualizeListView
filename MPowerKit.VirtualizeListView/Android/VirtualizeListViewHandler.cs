@@ -9,13 +9,15 @@ using Microsoft.Maui.Platform;
 
 namespace MPowerKit.VirtualizeListView;
 
-public class VirtualizeListViewRenderer : ScrollViewHandler
+public partial class VirtualizeListViewHandler : ScrollViewHandler
 {
     protected override MauiScrollView CreatePlatformView()
     {
         var scrollView = new SmoothScrollView(
-            new ContextThemeWrapper(MauiContext!.Context, Resource.Style.scrollViewTheme), null!,
-                Resource.Attribute.scrollViewStyle)
+            new ContextThemeWrapper(MauiContext!.Context, Resource.Style.scrollViewTheme),
+            null!,
+            Resource.Attribute.scrollViewStyle,
+            VirtualView as VirtualizeListView)
         {
             ClipToOutline = true,
             FillViewport = true
@@ -23,65 +25,43 @@ public class VirtualizeListViewRenderer : ScrollViewHandler
 
         return scrollView;
     }
-
-    protected override void ConnectHandler(MauiScrollView platformView)
-    {
-        base.ConnectHandler(platformView);
-
-        if (VirtualView is VirtualizeListView listView)
-        {
-            listView.AdjustScrollRequested += ListView_AdjustScrollRequested;
-        }
-    }
-
-    protected override void DisconnectHandler(MauiScrollView platformView)
-    {
-        if (VirtualView is VirtualizeListView listView)
-        {
-            listView.AdjustScrollRequested -= ListView_AdjustScrollRequested;
-        }
-
-        base.DisconnectHandler(platformView);
-    }
-
-    private void ListView_AdjustScrollRequested(object? sender, (double dx, double dy) e)
-    {
-        if (PlatformView is SmoothScrollView scrollView)
-        {
-            scrollView.AdjustScroll((int)this.Context.ToPixels(e.dx), (int)this.Context.ToPixels(e.dy));
-        }
-    }
 }
 
 public class SmoothScrollView : MauiScrollView
 {
     private OverScroller _scroller;
 
-    public SmoothScrollView(Context context) : base(context)
+    private VirtualizeListView _listView;
+
+    public SmoothScrollView(Context context, VirtualizeListView listView) : base(context)
     {
-        Init(context);
+        Init(context, listView);
     }
 
-    public SmoothScrollView(Context context, Android.Util.IAttributeSet attrs) : base(context, attrs)
+    public SmoothScrollView(Context context, Android.Util.IAttributeSet attrs, VirtualizeListView listView) : base(context, attrs)
     {
-        Init(context);
+        Init(context, listView);
     }
 
-    public SmoothScrollView(Context context, Android.Util.IAttributeSet attrs, int defStyleAttr) : base(context, attrs, defStyleAttr)
+    public SmoothScrollView(Context context, Android.Util.IAttributeSet attrs, int defStyleAttr, VirtualizeListView listView) : base(context, attrs, defStyleAttr)
     {
-        Init(context);
+        Init(context, listView);
     }
 
-    private void Init(Context context)
+    private void Init(Context context, VirtualizeListView listView)
     {
         var field = Java.Lang.Class.FromType(typeof(NestedScrollView)).GetDeclaredField("mScroller");
         field.Accessible = true;
 
         _scroller = (field.Get(this) as OverScroller)!;
+        _listView = listView;
     }
 
-    public virtual void AdjustScroll(int dx, int dy)
+    public virtual void AdjustScroll(double dxdp, double dydp)
     {
+        var dx = (int)this.Context.ToPixels(dxdp);
+        var dy = (int)this.Context.ToPixels(dydp);
+
         if (!_scroller.IsFinished)
         {
             var velocity = _scroller.CurrVelocity + dy;
@@ -91,12 +71,19 @@ public class SmoothScrollView : MauiScrollView
             this.ScrollBy(dx, dy);
 
             _scroller.ForceFinished(true);
-            Fling((int)direction);
+            base.Fling((int)direction);
         }
         else
         {
             ScrollBy(dx, dy);
         }
+    }
+
+    public override void Fling(int velocityY)
+    {
+        velocityY = (int)(velocityY / (int)_listView.ScrollSpeed);
+
+        base.Fling(velocityY);
     }
 
     protected override void OnScrollChanged(int l, int t, int oldl, int oldt)

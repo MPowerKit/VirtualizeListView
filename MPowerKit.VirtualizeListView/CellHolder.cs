@@ -3,6 +3,7 @@
 public class CellHolder : Grid
 {
     public VirtualizeListViewItem? Item { get; set; }
+    public bool IsCached => Item is null;
 
     public CellHolder()
     {
