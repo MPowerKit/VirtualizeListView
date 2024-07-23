@@ -15,9 +15,6 @@ public class ItemsLayoutManager : LayoutManager
 
     public override Size Measure(double widthConstraint, double heightConstraint)
     {
-        var measuredHeight = 0d;
-        var measuredWidth = 0d;
-
         Size newSize = new();
         if (Layout.ReadOnlyLaidOutItems.Count > 0)
         {
@@ -34,23 +31,11 @@ public class ItemsLayoutManager : LayoutManager
             var child = items[n];
             var view = child as CellHolder;
 
-            if (/*view.Item!.IsCached ||*/ view.IsCached || !view.Item.IsAttached) continue;
+            if (view.IsCached || !view.Item.IsAttached) continue;
 
-            //var bounds = view.Item.CellBounds;
-
+            // this triggers item size change when needed
             var measure = child.Measure(double.PositiveInfinity, double.PositiveInfinity);
-
-            //measuredWidth = Math.Max(measuredWidth, bounds.Left + view.Item.Margin.Right + measure.Width);
-            //measuredHeight = Math.Max(measuredHeight, bounds.Top + view.Item.Margin.Bottom + measure.Height);
         }
-
-        //var finalWidth = GetFinalLength(Layout.Width, widthConstraint, measuredWidth);
-        //var finalHeight = GetFinalLength(Layout.Height, heightConstraint, measuredHeight);
-
-        //var finalWidth = GetFinalLength(newSize.Width, widthConstraint, measuredWidth);
-        //var finalHeight = GetFinalLength(newSize.Height, heightConstraint, measuredHeight);
-
-        //return new(finalWidth, finalHeight);
 
         return newSize;
     }
@@ -69,10 +54,9 @@ public class ItemsLayoutManager : LayoutManager
         {
             var child = items[n];
             var view = child as CellHolder;
-#if WINDOWS
-            if (/*view.Item.IsCached ||*/ view.IsCached || !view.Item.IsAttached) continue;
-#elif ANDROID
-            if (/*!view.Item.IsCached &&*/ view.IsCached || !view.Item.IsAttached) continue;
+
+#if !MACIOS
+            if (view.IsCached || !view.Item.IsAttached) continue;
 #endif
 
             var (x, y) =
@@ -84,7 +68,7 @@ public class ItemsLayoutManager : LayoutManager
 
             var newBounds = new Rect(x, y, view.DesiredSize.Width, view.DesiredSize.Height);
 
-#if !WINDOWS
+#if MACIOS
             if (view.Bounds == newBounds) continue;
 #endif
 
@@ -92,12 +76,5 @@ public class ItemsLayoutManager : LayoutManager
         }
 
         return new(availableWidth, availableHeight);
-    }
-
-    private double GetFinalLength(double explicitLength, double externalConstraint, double measuredLength)
-    {
-        var length = Math.Min(double.IsNaN(explicitLength) ? measuredLength : explicitLength, externalConstraint);
-
-        return Math.Max(length, 0);
     }
 }

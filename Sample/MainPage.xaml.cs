@@ -24,20 +24,21 @@ public partial class MainPage
     {
         InitializeComponent();
 
-        //FillItems();
+        FillItems();
     }
 
     private void FillItems()
     {
         var items = new ObservableRangeCollection<Item>();
-        for (int i = 0; i < 500; i++)
+        for (int i = 0; i < 50; i++)
         {
             items.Add(new Item()
             {
                 Id = i,
                 Title = $"This is title for {i}",
                 Description = $"This is the long description for {i}, alsdnhkjadfng askdsn kdag ndfnb ksdfhk adfkj ndkfg akfn bkjdfng kjdfhg kjadfnkjandf kgjankgj",
-                //Image = $"https://picsum.photos/id/{i}/300/200"
+                Image = "https://picsum.photos/600",
+                Height = 50
             });
         }
 
@@ -65,7 +66,8 @@ public partial class MainPage
                 Id = i + 500,
                 Title = $"This is title for {i + 500}",
                 Description = $"This is the long description for {i + 500}, alsdnhkjadfng askdsn kdag ndfnb ksdfhk adfkj ndkfg akfn bkjdfng kjdfhg kjadfnkjandf kgjankgj",
-                Image = $"https://picsum.photos/id/{i + 500}/300/200"
+                Image = "https://picsum.photos/600",
+                Height = 50
             });
         }
 
@@ -90,7 +92,8 @@ public partial class MainPage
                 Id = i + 500,
                 Title = $"This is title for {i + 500}",
                 Description = $"This is the long description for {i + 500}, alsdnhkjadfng askdsn kdag ndfnb ksdfhk adfkj ndkfg akfn bkjdfng kjdfhg kjadfnkjandf kgjankgj",
-                Image = $"https://picsum.photos/id/{i + 500}/300/200"
+                Image = "https://picsum.photos/600",
+                Height = 50
             });
         }
 
@@ -114,7 +117,7 @@ public partial class MainPage
 
     private void Entry_TextChanged(object sender, TextChangedEventArgs e)
     {
-        var items = new List<Item>();
+        var items = new ObservableRangeCollection<Item>();
         if (!string.IsNullOrWhiteSpace(e.NewTextValue))
         {
             var count = _rnd.Next(10, 50);

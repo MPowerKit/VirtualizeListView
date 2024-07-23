@@ -26,6 +26,13 @@ public class VirtualizeListView : ScrollView
         OnItemsLayoutSet();
     }
 
+    protected override void OnHandlerChanged()
+    {
+        base.OnHandlerChanged();
+
+        ChangeScrollSpeed();
+    }
+
     protected override void OnPropertyChanging([CallerMemberName] string? propertyName = null)
     {
         base.OnPropertyChanging(propertyName);
@@ -69,7 +76,11 @@ public class VirtualizeListView : ScrollView
         {
             LayoutManager?.InvalidateLayout();
         }
-#if IOS
+        else if (propertyName == ScrollSpeedProperty.PropertyName)
+        {
+            ChangeScrollSpeed();
+        }
+#if MACIOS
         else if (propertyName == ContentSizeProperty.PropertyName)
         {
             InvalidateMeasure();
@@ -111,6 +122,18 @@ public class VirtualizeListView : ScrollView
         }
     }
 
+    protected virtual void ChangeScrollSpeed()
+    {
+        if (Handler is null) return;
+
+#if MACIOS
+        var scroll = this.Handler?.PlatformView as UIKit.UIScrollView;
+        scroll.DecelerationRate = ScrollSpeed is ScrollSpeed.Normal
+            ? UIKit.UIScrollView.DecelerationRateFast
+            : UIKit.UIScrollView.DecelerationRateNormal;
+#endif
+    }
+
     private void Refresh_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == RefreshView.IsRefreshingProperty.PropertyName)
@@ -126,7 +149,7 @@ public class VirtualizeListView : ScrollView
             LayoutManager = new LinearItemsLayoutManager()
             {
                 ItemSpacing = linearLayout.ItemSpacing,
-                PoolSize = linearLayout.PoolSize,
+                CachePoolSize = linearLayout.PoolSize,
                 BindingContext = null
             };
         }
@@ -186,14 +209,14 @@ public class VirtualizeListView : ScrollView
     {
         AdjustScrollRequested?.Invoke(this, (dx, dy));
 
-#if IOS || MACCATALYST
-        var scroll = (this.Handler?.PlatformView as UIKit.UIScrollView);
+#if MACIOS
+        var scroll = this.Handler?.PlatformView as UIKit.UIScrollView;
         scroll?.SetContentOffset(new(ScrollX + dx, ScrollY + dy), false);
 #elif WINDOWS
-        var scroll = (this.Handler?.PlatformView as dynamic);
+        var scroll = this.Handler?.PlatformView as Microsoft.UI.Xaml.Controls.ScrollViewer;
         scroll?.ChangeView(ScrollX + dx, ScrollY + dy, null, true);
 #else
-        var scroll = (this.Handler?.PlatformView as SmoothScrollView);
+        var scroll = this.Handler?.PlatformView as SmoothScrollView;
         scroll?.AdjustScroll(dx, dy);
 #endif
     }

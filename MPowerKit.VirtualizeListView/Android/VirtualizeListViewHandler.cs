@@ -4,11 +4,12 @@ using Android.Widget;
 
 using AndroidX.Core.Widget;
 
+using Microsoft.Maui.Handlers;
 using Microsoft.Maui.Platform;
 
 namespace MPowerKit.VirtualizeListView;
 
-public partial class VirtualizeListViewHandler
+public partial class VirtualizeListViewHandler : ScrollViewHandler
 {
     protected override MauiScrollView CreatePlatformView()
     {

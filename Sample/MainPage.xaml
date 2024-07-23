@@ -45,7 +45,7 @@
                     <mpowerkit:VirtualizeListViewCell>
                         <Grid ColumnDefinitions="Auto,*"
                               ColumnSpacing="15"
-                              RowDefinitions="Auto,*"
+                              RowDefinitions="Auto,Auto,*"
                               RowSpacing="10">
                             <Grid.GestureRecognizers>
                                 <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped" />
@@ -62,9 +62,9 @@
                                 <Label FontSize="16"
                                        Text="{Binding Id}" />
                             </StackLayout>
-                            <!--<Entry Grid.Row="1"
-                                   Grid.ColumnSpan="2"/>-->
-                            <Label Grid.Row="1"
+                            <Entry Grid.Row="1"
+                                   Grid.ColumnSpan="2" />
+                            <Label Grid.Row="2"
                                    Grid.ColumnSpan="2"
                                    FontAttributes="Italic"
                                    FontSize="18"

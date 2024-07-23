@@ -180,15 +180,15 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
         }
     }
 
-    protected override bool AdjustScrollIfNeeded(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem prevFirstVisiblItem, Rect prevCellBounds)
+    protected override bool AdjustScrollIfNeeded(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem prevItem, Rect prevCellBounds)
     {
-        if (IsOrientation(ScrollOrientation.Both) || prevFirstVisiblItem.Position == -1) return false;
+        if (IsOrientation(ScrollOrientation.Both) || prevItem.Position == -1) return false;
 
         bool needs;
 
         if (IsOrientation(ScrollOrientation.Vertical))
         {
-            var dy = prevFirstVisiblItem.CellBounds.Bottom - prevCellBounds.Bottom;
+            var dy = prevItem.CellBounds.Bottom - prevCellBounds.Bottom;
 
             needs = dy != 0d;
             if (!needs) return needs;
@@ -197,7 +197,7 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
         }
         else
         {
-            var dx = prevFirstVisiblItem.CellBounds.Right - prevCellBounds.Right;
+            var dx = prevItem.CellBounds.Right - prevCellBounds.Right;
 
             needs = dx != 0d;
             if (!needs) return needs;
