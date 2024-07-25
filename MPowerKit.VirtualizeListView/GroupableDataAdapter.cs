@@ -3,27 +3,19 @@ using System.Collections.Specialized;
 
 namespace MPowerKit.VirtualizeListView;
 
-public class GroupableDataAdapter : DataAdapter
+public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(listView)
 {
-    public class GroupItem
+    public class GroupItem(object group, object data) : AdapterItem(data)
     {
-        public GroupItem(object item)
-        {
-            Item = item;
-        }
-        public object Item { get; set; }
+        public object Group { get; set; } = group;
     }
-    public class GroupHeader(object item) : GroupItem(item) { }
-    public class GroupFooter(object item) : GroupItem(item) { }
+    public class GroupHeaderItem(object group) : GroupItem(group, group) { }
+    public class GroupFooterItem(object group) : GroupItem(group, group) { }
 
-    protected IEnumerable<IEnumerable> GroupedItems { get; set; }
+    protected IEnumerable<IEnumerable> GroupedItems { get; set; } = [];
 
     public virtual bool HasGroupHeader => Control.IsGrouped && Control.GroupHeaderTemplate is not null;
     public virtual bool HasGroupFooter => Control.IsGrouped && Control.GroupFooterTemplate is not null;
-
-    public GroupableDataAdapter(VirtualizeListView listView) : base(listView)
-    {
-    }
 
     public virtual bool IsGroupHeader(DataTemplate template, int position)
     {
@@ -35,16 +27,16 @@ public class GroupableDataAdapter : DataAdapter
         return IsOneOf(Control.GroupFooterTemplate, template, position);
     }
 
-    protected override DataTemplate GetItemTemplate(object item)
+    protected override DataTemplate GetItemTemplate(AdapterItem item)
     {
-        if (item is GroupHeader groupHeader)
+        if (item is GroupHeaderItem groupHeader)
         {
-            return GetGroupHeaderTemplate(groupHeader.Item);
+            return GetGroupHeaderTemplate(groupHeader.Group);
         }
 
-        if (item is GroupFooter groupFooter)
+        if (item is GroupFooterItem groupFooter)
         {
-            return GetGroupFooterTemplate(groupFooter.Item);
+            return GetGroupFooterTemplate(groupFooter.Group);
         }
 
         return base.GetItemTemplate(item);
@@ -115,12 +107,12 @@ public class GroupableDataAdapter : DataAdapter
 
         var item = InternalItems[position];
 
-        if (item is GroupHeader && content is VirtualizeListViewCell)
+        if (item is GroupHeaderItem && content is VirtualizeListViewCell)
         {
             throw new ArgumentException("GroupHeaderTemplate can't be typeof(VirtualizeListViewCell)");
         }
 
-        if (item is GroupFooter && content is VirtualizeListViewCell)
+        if (item is GroupFooterItem && content is VirtualizeListViewCell)
         {
             throw new ArgumentException("GroupFooterTemplate can't be typeof(VirtualizeListViewCell)");
         }
@@ -133,54 +125,40 @@ public class GroupableDataAdapter : DataAdapter
         return holder;
     }
 
-    public override void OnBindCell(CellHolder holder, int position)
-    {
-        var data = Items[position];
-
-        holder.BindingContext = data is GroupItem groupItem ? groupItem.Item : data;
-
-        if (holder.Children[0] is not VirtualizeListViewCell cell) return;
-
-        cell.SendAppearing();
-        OnItemAppearing(data, position);
-    }
-
-    public override (int RealPosition, int RealItemsCount) GetRealPositionAndCount(object item, int position)
+    public override (int RealPosition, int RealItemsCount) GetRealPositionAndCount(AdapterItem item, int position)
     {
         if (!Control.IsGrouped)
         {
             return base.GetRealPositionAndCount(item, position);
         }
 
-        var header = HasHeader.ToInt();
-
         var totalCount = InternalItems.Count;
-
-        var groupItemsCount = InternalItems.Count(i => i is GroupItem);
-
-        var realPosition = 0;
-        for (int i = header; i < position; i++)
+        var realPosition = -1;
+        var realItemsCount = 0;
+        for (int i = 0; i < totalCount; i++)
         {
-            if (InternalItems[i] is GroupItem) continue;
-            realPosition++;
-        }
+            if (InternalItems[i] is GroupHeaderItem or GroupFooterItem or HeaderItem or FooterItem) continue;
 
-        var realItemsCount = totalCount - groupItemsCount - header - HasFooter.ToInt();
+            realItemsCount++;
+
+            if (i <= position) realPosition++;
+        }
 
         return (realPosition, realItemsCount);
     }
 
-    protected virtual int GetFlattenedIndexOfGroup(IEnumerable group)
+    protected virtual int GetFlattenedGroupIndexOfGroup(IEnumerable group)
     {
-        var groupIndex = GroupedItems.IndexOf(group);
-        return GetFlattenedIndexForGroupIndex(groupIndex);
+        return InternalItems.FindIndex(i => i is GroupItem groupItem && groupItem.Group == group);
     }
 
-    protected virtual int GetFlattenedIndexForGroupIndex(int groupIndex)
+    protected virtual int GetFlattenedGroupIndexForGroupIndex(int groupIndex)
     {
-        var groupsToSkip = GroupedItems.Take(groupIndex);
+        var groups = GroupedItems!;
+
+        var groupsToSkip = groups.Take(groupIndex);
         var skipCount = (HasGroupHeader.ToInt() + HasGroupFooter.ToInt()) * groupIndex;
-        return skipCount + groupsToSkip.Sum(static g => g.Count());
+        return skipCount + groupsToSkip.Sum(static g => g.Count()) + HasHeader.ToInt();
     }
 
     protected override void RemoveListenerCollection(IEnumerable? itemsSource)
@@ -196,13 +174,7 @@ public class GroupableDataAdapter : DataAdapter
             throw new ArgumentException("The collection type for IsGrouped should be only typeof(IEnumerable<IEnumerable>) or derived interfaces or classes from it");
         }
 
-        foreach (var group in groups)
-        {
-            if (group is INotifyCollectionChanged notifyGroup)
-            {
-                notifyGroup.CollectionChanged -= GroupChanged;
-            }
-        }
+        ResetGroups(groups);
 
         base.RemoveListenerCollection(itemsSource);
     }
@@ -215,10 +187,21 @@ public class GroupableDataAdapter : DataAdapter
             return;
         }
 
-        if (itemsSource is not IEnumerable<IEnumerable> groups)
+        if (itemsSource is not IEnumerable<IEnumerable>)
         {
             throw new ArgumentException("The collection type for IsGrouped should be only typeof(IEnumerable<IEnumerable>) or derived interfaces or classes from it");
         }
+
+        base.InitCollection(itemsSource);
+    }
+
+    #region CollectionChanged events
+    protected virtual List<AdapterItem> FlattenGroups(IEnumerable<IEnumerable> groups)
+    {
+        List<AdapterItem> flatItems = [];
+
+        var hasGroupHeader = HasGroupHeader;
+        var hasGroupFooter = HasGroupFooter;
 
         foreach (var group in groups)
         {
@@ -226,152 +209,108 @@ public class GroupableDataAdapter : DataAdapter
             {
                 notifyGroup.CollectionChanged += GroupChanged;
             }
-        }
 
-        base.InitCollection(itemsSource);
-    }
-
-    #region CollectionChanged events
-    protected virtual IEnumerable FlattenItems(IEnumerable<IEnumerable> groups)
-    {
-        List<object> flatItems = [];
-
-        var hasHeader = HasGroupHeader;
-        var hasFooter = HasGroupFooter;
-
-        foreach (var group in GroupedItems)
-        {
-            if (hasHeader) flatItems.Add(new GroupHeader(group));
-            foreach (var item in group) flatItems.Add(item);
-            if (hasFooter) flatItems.Add(new GroupFooter(group));
+            if (hasGroupHeader) flatItems.Add(new GroupHeaderItem(group));
+            foreach (var item in group) flatItems.Add(new GroupItem(group, item));
+            if (hasGroupFooter) flatItems.Add(new GroupFooterItem(group));
         }
 
         return flatItems;
     }
 
-    protected override void OnCollectionChangedAdd(IEnumerable? itemsSource, NotifyCollectionChangedEventArgs e)
+    protected virtual int ResetGroups(IEnumerable<IEnumerable> groups)
+    {
+        var hasGroupHeader = HasGroupHeader;
+        var hasGroupFooter = HasGroupFooter;
+
+        var totalItemsCount = 0;
+        foreach (IEnumerable group in groups)
+        {
+            if (group is INotifyCollectionChanged notifyGroup)
+            {
+                notifyGroup.CollectionChanged -= GroupChanged;
+            }
+
+            if (hasGroupHeader) totalItemsCount++;
+            foreach (var item in group) totalItemsCount++;
+            if (hasGroupFooter) totalItemsCount++;
+        }
+
+        return totalItemsCount;
+    }
+
+    protected override void OnCollectionChangedAdd(NotifyCollectionChangedEventArgs e)
     {
         if (!Control.IsGrouped)
         {
-            base.OnCollectionChangedAdd(itemsSource, e);
+            base.OnCollectionChangedAdd(e);
             return;
         }
 
         if (e.NewItems?.Count is null or 0) return;
 
-        var hasHeader = HasGroupHeader;
-        var hasFooter = HasGroupFooter;
-        var realIndex = GetFlattenedIndexForGroupIndex(e.NewStartingIndex) + HasHeader.ToInt();
+        var realGroupIndex = GetFlattenedGroupIndexForGroupIndex(e.NewStartingIndex);
 
-        List<object> list = [];
-        foreach (IEnumerable group in e.NewItems)
-        {
-            if (group is INotifyCollectionChanged notifyGroup)
-            {
-                notifyGroup.CollectionChanged += GroupChanged;
-            }
+        var flattenedItems = FlattenGroups(e.NewItems.Cast<IEnumerable>());
 
-            if (hasHeader) list.Add(new GroupHeader(group));
-            foreach (var item in group) list.Add(item);
-            if (hasFooter) list.Add(new GroupFooter(group));
-        }
-
-        InternalItems.InsertRange(realIndex, list);
-        NotifyItemRangeInserted(realIndex, list.Count);
+        InternalItems.InsertRange(realGroupIndex, flattenedItems);
+        NotifyItemRangeInserted(realGroupIndex, flattenedItems.Count);
     }
 
-    protected override void OnCollectionChangedRemove(IEnumerable? itemsSource, NotifyCollectionChangedEventArgs e)
+    protected override void OnCollectionChangedRemove(NotifyCollectionChangedEventArgs e)
     {
         if (!Control.IsGrouped)
         {
-            base.OnCollectionChangedRemove(itemsSource, e);
+            base.OnCollectionChangedRemove(e);
             return;
         }
 
         if (e.OldItems?.Count is null or 0) return;
 
-        var hasHeader = HasGroupHeader;
-        var hasFooter = HasGroupFooter;
-        var realIndex = GetFlattenedIndexForGroupIndex(e.OldStartingIndex) + HasHeader.ToInt();
+        var realGroupIndex = GetFlattenedGroupIndexForGroupIndex(e.OldStartingIndex);
 
-        var countToRemove = 0;
-        foreach (IEnumerable group in e.OldItems)
-        {
-            if (group is INotifyCollectionChanged notifyGroup)
-            {
-                notifyGroup.CollectionChanged -= GroupChanged;
-            }
+        var countToRemove = ResetGroups(e.OldItems.Cast<IEnumerable>());
 
-            if (hasHeader) countToRemove++;
-            foreach (var item in group) countToRemove++;
-            if (hasFooter) countToRemove++;
-        }
-
-        InternalItems.RemoveRange(realIndex, countToRemove);
-        NotifyItemRangeRemoved(realIndex, countToRemove);
+        InternalItems.RemoveRange(realGroupIndex, countToRemove);
+        NotifyItemRangeRemoved(realGroupIndex, countToRemove);
     }
 
-    protected override void OnCollectionChangedReplace(IEnumerable? itemsSource, NotifyCollectionChangedEventArgs e)
+    protected override void OnCollectionChangedReplace(NotifyCollectionChangedEventArgs e)
     {
         if (!Control.IsGrouped)
         {
-            base.OnCollectionChangedReplace(itemsSource, e);
+            base.OnCollectionChangedReplace(e);
             return;
         }
 
         if (e.NewItems?.Count is null or 0 || e.OldItems?.Count is null or 0) return;
 
-        var hasHeader = HasGroupHeader;
-        var hasFooter = HasGroupFooter;
-        var realIndex = GetFlattenedIndexForGroupIndex(e.NewStartingIndex) + HasHeader.ToInt();
+        var realGroupIndex = GetFlattenedGroupIndexForGroupIndex(e.OldStartingIndex);
 
-        var countToRemove = 0;
-        foreach (IEnumerable group in e.OldItems)
-        {
-            if (group is INotifyCollectionChanged notifyGroup)
-            {
-                notifyGroup.CollectionChanged -= GroupChanged;
-            }
+        var countToRemove = ResetGroups(e.OldItems.Cast<IEnumerable>());
+        InternalItems.RemoveRange(realGroupIndex, countToRemove);
 
-            if (hasHeader) countToRemove++;
-            foreach (var item in group) countToRemove++;
-            if (hasFooter) countToRemove++;
-        }
-        InternalItems.RemoveRange(realIndex, countToRemove);
+        var flattenedItems = FlattenGroups(e.OldItems.Cast<IEnumerable>());
+        InternalItems.InsertRange(realGroupIndex, flattenedItems);
 
-        List<object> list = [];
-        foreach (IEnumerable group in e.NewItems)
-        {
-            if (group is INotifyCollectionChanged notifyGroup)
-            {
-                notifyGroup.CollectionChanged += GroupChanged;
-            }
-
-            if (hasHeader) list.Add(new GroupHeader(group));
-            foreach (var item in group) list.Add(item);
-            if (hasFooter) list.Add(new GroupFooter(group));
-        }
-        InternalItems.InsertRange(realIndex, list);
-
-        NotifyItemRangeChanged(e.OldStartingIndex, countToRemove, list.Count);
+        NotifyItemRangeChanged(e.OldStartingIndex, countToRemove, flattenedItems.Count);
     }
 
-    protected override void OnCollectionChangedMove(IEnumerable? itemsSource, NotifyCollectionChangedEventArgs e)
+    protected override void OnCollectionChangedMove(NotifyCollectionChangedEventArgs e)
     {
         if (!Control.IsGrouped)
         {
-            base.OnCollectionChangedMove(itemsSource, e);
+            base.OnCollectionChangedMove(e);
             return;
         }
 
         if (e.NewItems?.Count is null or 0 or > 1 || e.OldItems?.Count is null or 0 or > 1
             || e.NewStartingIndex == e.OldStartingIndex) return;
 
-        var additional = HasHeader.ToInt();
         var oldIndex = e.OldStartingIndex;
         var newIndex = e.NewStartingIndex;
-        var realOldIndex = GetFlattenedIndexForGroupIndex(oldIndex) + additional;
-        var realNewIndex = GetFlattenedIndexForGroupIndex(newIndex) + additional;
+        var realOldIndex = GetFlattenedGroupIndexForGroupIndex(oldIndex);
+        var realNewIndex = GetFlattenedGroupIndexForGroupIndex(newIndex);
         var group = (e.NewItems[0] as IEnumerable)!;
 
         if (newIndex < oldIndex)
@@ -407,9 +346,21 @@ public class GroupableDataAdapter : DataAdapter
 
         GroupedItems = groups;
 
-        var flattenedItems = FlattenItems(groups);
+        var flattenedItems = FlattenGroups(groups);
 
-        base.OnCollectionChangedReset(flattenedItems);
+        if (HasHeader)
+        {
+            flattenedItems.Insert(0, new HeaderItem(Control.Header));
+        }
+
+        if (HasFooter)
+        {
+            flattenedItems.Add(new FooterItem(Control.Footer));
+        }
+
+        InternalItems = flattenedItems;
+
+        NotifyDataSetChanged();
     }
 
     protected virtual void GroupChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -442,37 +393,27 @@ public class GroupableDataAdapter : DataAdapter
     {
         if (e.NewItems?.Count is null or 0) return;
 
-        var realIndex = e.NewStartingIndex + GetFlattenedIndexOfGroup(group) + HasGroupHeader.ToInt() + HasHeader.ToInt();
+        var realGroupItemIndex = e.NewStartingIndex + GetFlattenedGroupIndexOfGroup(group) + HasGroupHeader.ToInt() - HasHeader.ToInt();
 
-        InternalItems.InsertRange(realIndex, e.NewItems.Cast<object>());
-        NotifyItemRangeInserted(realIndex, e.NewItems.Count);
+        base.OnCollectionChangedAdd(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, e.NewItems, realGroupItemIndex));
     }
 
     protected virtual void GroupItemsRemoved(IEnumerable group, NotifyCollectionChangedEventArgs e)
     {
         if (e.OldItems?.Count is null or 0) return;
 
-        var realIndex = e.OldStartingIndex + GetFlattenedIndexOfGroup(group) + HasGroupHeader.ToInt() + HasHeader.ToInt();
+        var realGroupItemIndex = e.OldStartingIndex + GetFlattenedGroupIndexOfGroup(group) + HasGroupHeader.ToInt() - HasHeader.ToInt();
 
-        var count = e.OldItems.Count;
-
-        InternalItems.RemoveRange(realIndex, count);
-        NotifyItemRangeRemoved(realIndex, count);
+        base.OnCollectionChangedRemove(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, e.OldItems, realGroupItemIndex));
     }
 
     protected virtual void GroupItemsReplaced(IEnumerable group, NotifyCollectionChangedEventArgs e)
     {
-        if (e.NewItems?.Count is null or 0 || e.OldItems?.Count is null or 0)
-        {
-            return;
-        }
+        if (e.NewItems?.Count is null or 0 || e.OldItems?.Count is null or 0) return;
 
-        var realIndex = e.NewStartingIndex + GetFlattenedIndexOfGroup(group) + HasGroupHeader.ToInt() + HasHeader.ToInt();
-        var countToRemove = e.OldItems.Count;
+        var realGroupItemIndex = e.NewStartingIndex + GetFlattenedGroupIndexOfGroup(group) + HasGroupHeader.ToInt() - HasHeader.ToInt();
 
-        InternalItems.RemoveRange(realIndex, countToRemove);
-        InternalItems.InsertRange(realIndex, e.NewItems.Cast<object>());
-        NotifyItemRangeChanged(realIndex, countToRemove, e.NewItems.Count);
+        base.OnCollectionChangedReplace(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, e.NewItems, e.OldItems, realGroupItemIndex));
     }
 
     private void GroupItemsMoved(IEnumerable group, NotifyCollectionChangedEventArgs e)
@@ -483,34 +424,47 @@ public class GroupableDataAdapter : DataAdapter
             return;
         }
 
-        var realIndex = GetFlattenedIndexOfGroup(group) + HasGroupHeader.ToInt() + HasHeader.ToInt();
-        var oldIndex = e.OldStartingIndex + realIndex;
-        var newIndex = e.NewStartingIndex + realIndex;
+        var realGroupStartIndex = GetFlattenedGroupIndexOfGroup(group) + HasGroupHeader.ToInt() - HasHeader.ToInt();
 
-        InternalItems.Move(oldIndex, newIndex);
-        NotifyItemMoved(oldIndex, newIndex);
+        var newIndex = e.NewStartingIndex + realGroupStartIndex;
+        var oldIndex = e.OldStartingIndex + realGroupStartIndex;
+
+        base.OnCollectionChangedMove(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, e.NewItems[0], newIndex, oldIndex));
     }
 
     private void GroupItemsReset(IEnumerable group, NotifyCollectionChangedEventArgs e)
     {
-        var count = group.Count();
+        var groupIndex = GetFlattenedGroupIndexOfGroup(group);
+        if (groupIndex == -1) return;
 
-        if ((e.NewItems is null && e.OldItems is null)
-            || (count > 0 && e.OldItems?.Count is null or 0))
+        var totalCount = InternalItems.Count;
+
+        var prevGroupItems = InternalItems.FindAll(i => i is GroupItem groupItem and not GroupHeaderItem and not GroupFooterItem
+                                                        && groupItem.Group == group)
+                                          .Select(i => i.Data)
+                                          .ToList();
+
+        var prevGroupCount = prevGroupItems.Count;
+
+        var currentCount = group.Count();
+
+        if (prevGroupCount == 0 && currentCount == 0) return;
+
+        if (prevGroupCount == 0 && currentCount > 0)
         {
             GroupItemsAdd(group, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, group.Cast<object>().ToList(), 0));
             return;
         }
 
-        if (count == 0 && e.OldItems is not null && e.OldItems.Count > 0)
+        if (prevGroupCount > 0 && currentCount == 0)
         {
-            GroupItemsRemoved(group, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, e.OldItems, 0));
+            GroupItemsRemoved(group, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, prevGroupItems, 0));
             return;
         }
 
-        if (count > 0 && e.OldItems is not null && e.OldItems.Count > 0)
+        if (prevGroupCount > 0 && currentCount > 0)
         {
-            GroupItemsReplaced(group, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, group.Cast<object>().ToList(), e.OldItems, 0));
+            GroupItemsReplaced(group, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, group.Cast<object>().ToList(), prevGroupItems, 0));
             return;
         }
     }

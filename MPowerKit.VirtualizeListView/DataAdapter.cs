@@ -6,21 +6,28 @@ namespace MPowerKit.VirtualizeListView;
 
 public class DataAdapter : IDisposable
 {
-    public event EventHandler DataSetChanged;
-    public event EventHandler<(int startingIndex, int totalCount)> ItemRangeInserted;
-    public event EventHandler<(int startingIndex, int totalCount)> ItemRangeRemoved;
-    public event EventHandler<(int startingIndex, int oldCount, int newCount)> ItemRangeChanged;
-    public event EventHandler<(int oldIndex, int newIndex)> ItemMoved;
+    public class AdapterItem(object data)
+    {
+        public object Data { get; } = data;
+    }
+    public class HeaderItem(object data) : AdapterItem(data);
+    public class FooterItem(object data) : AdapterItem(data);
+
+    public event EventHandler? DataSetChanged;
+    public event EventHandler<(int startingIndex, int totalCount)>? ItemRangeInserted;
+    public event EventHandler<(int startingIndex, int totalCount)>? ItemRangeRemoved;
+    public event EventHandler<(int startingIndex, int oldCount, int newCount)>? ItemRangeChanged;
+    public event EventHandler<(int oldIndex, int newIndex)>? ItemMoved;
 
     protected VirtualizeListView Control { get; set; }
-    protected List<object> InternalItems { get; set; } = [];
+    protected List<AdapterItem> InternalItems { get; set; } = [];
 
-    public IReadOnlyList<object> Items => InternalItems;
+    public IReadOnlyList<AdapterItem> Items => InternalItems;
 
     public bool IsDisposed { get; protected set; }
 
-    protected bool HadHeader { get; set; }
-    protected bool HadFooter { get; set; }
+    protected bool HadHeader => InternalItems.ElementAtOrDefault(0) is HeaderItem;
+    protected bool HadFooter => InternalItems.ElementAtOrDefault(ItemsCount - 1) is FooterItem;
 
     public virtual bool HasHeader => Control.Header is not null && Control.HeaderTemplate is not null;
     public virtual bool HasFooter => Control.Footer is not null && Control.FooterTemplate is not null;
@@ -31,22 +38,7 @@ public class DataAdapter : IDisposable
     {
         Control = listView;
 
-        Control.PropertyChanging += Control_PropertyChanging;
         Control.PropertyChanged += Control_PropertyChanged;
-    }
-
-    private void Control_PropertyChanging(object sender, Microsoft.Maui.Controls.PropertyChangingEventArgs e)
-    {
-        if (e.PropertyName == VirtualizeListView.HeaderProperty.PropertyName
-            || e.PropertyName == VirtualizeListView.HeaderTemplateProperty.PropertyName)
-        {
-            HadHeader = HasHeader;
-        }
-        else if (e.PropertyName == VirtualizeListView.FooterProperty.PropertyName
-            || e.PropertyName == VirtualizeListView.FooterTemplateProperty.PropertyName)
-        {
-            HadFooter = HasFooter;
-        }
     }
 
     private void Control_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -54,43 +46,47 @@ public class DataAdapter : IDisposable
         if (e.PropertyName == VirtualizeListView.HeaderProperty.PropertyName
              || e.PropertyName == VirtualizeListView.HeaderTemplateProperty.PropertyName)
         {
-            if (HadHeader && !HasHeader)
+            var hadHeader = HadHeader;
+
+            if (hadHeader && !HasHeader)
             {
                 InternalItems.RemoveAt(0);
                 NotifyItemRangeRemoved(0, 1);
             }
-            else if (!HadHeader && HasHeader)
+            else if (!hadHeader && HasHeader)
             {
-                InternalItems.Insert(0, Control.Header);
+                InternalItems.Insert(0, new HeaderItem(Control.Header));
                 NotifyItemRangeInserted(0, 1);
             }
             else if (HadHeader && HasHeader)
             {
                 InternalItems.RemoveAt(0);
-                InternalItems.Insert(0, Control.Header);
+                InternalItems.Insert(0, new HeaderItem(Control.Header));
                 NotifyItemRangeChanged(0, 1, 1);
             }
         }
         else if (e.PropertyName == VirtualizeListView.FooterProperty.PropertyName
             || e.PropertyName == VirtualizeListView.FooterTemplateProperty.PropertyName)
         {
-            if (HadFooter && !HasFooter)
+            var hadFooter = HadFooter;
+
+            if (hadFooter && !HasFooter)
             {
-                var position = InternalItems.Count - 1;
+                var position = ItemsCount - 1;
 
                 InternalItems.RemoveAt(position);
                 NotifyItemRangeRemoved(position, 1);
             }
-            else if (!HadFooter && HasFooter)
+            else if (!hadFooter && HasFooter)
             {
-                InternalItems.Add(Control.Footer);
-                NotifyItemRangeInserted(InternalItems.Count - 1, 1);
+                InternalItems.Add(new FooterItem(Control.Footer));
+                NotifyItemRangeInserted(ItemsCount - 1, 1);
             }
-            else if (HadFooter && HasFooter)
+            else if (hadFooter && HasFooter)
             {
-                var position = InternalItems.Count - 1;
+                var position = ItemsCount - 1;
                 InternalItems.RemoveAt(position);
-                InternalItems.Add(Control.Footer);
+                InternalItems.Add(new FooterItem(Control.Footer));
                 NotifyItemRangeChanged(position, 1, 1);
             }
         }
@@ -131,11 +127,11 @@ public class DataAdapter : IDisposable
         return Control.FooterTemplate;
     }
 
-    protected virtual DataTemplate GetItemTemplate(object item)
+    protected virtual DataTemplate GetItemTemplate(AdapterItem item)
     {
         if (Control.ItemTemplate is DataTemplateSelector selector)
         {
-            return selector.SelectTemplate(item, Control);
+            return selector.SelectTemplate(item.Data, Control);
         }
 
         return Control.ItemTemplate;
@@ -233,7 +229,7 @@ public class DataAdapter : IDisposable
 
         if (itemTemplate is DataTemplateSelector selector)
         {
-            itemTemplate = selector.SelectTemplate(item, Control);
+            itemTemplate = selector.SelectTemplate(item.Data, Control);
         }
         return itemTemplate == currentTemplate;
     }
@@ -250,27 +246,19 @@ public class DataAdapter : IDisposable
 
     public virtual void OnBindCell(CellHolder holder, int position)
     {
-        var data = Items[position];
+        var item = Items[position];
 
-        holder.BindingContext = data;
+        holder.BindingContext = item.Data;
 
         if (holder.Children[0] is not VirtualizeListViewCell cell) return;
 
         cell.SendAppearing();
-        OnItemAppearing(data, position);
-    }
-
-    protected virtual void OnItemAppearing(object item, int position)
-    {
-        var (realPosition, realItemsCount) = GetRealPositionAndCount(item, position);
-
-        if (realItemsCount == 0) return;
-
-        Control.OnItemAppearing(item, realPosition, realItemsCount);
+        OnItemAppearing(item, position);
     }
 
     public virtual void OnCellRecycled(CellHolder holder, int position)
     {
+        var item = Items[position];
         var content = holder.Children[0];
 
         try
@@ -278,7 +266,7 @@ public class DataAdapter : IDisposable
             if (content is not VirtualizeListViewCell cell) return;
 
             cell.SendDisappearing();
-            OnItemDisappearing(holder.BindingContext, position);
+            OnItemDisappearing(item, position);
         }
         finally
         {
@@ -289,16 +277,25 @@ public class DataAdapter : IDisposable
         }
     }
 
-    protected virtual void OnItemDisappearing(object item, int position)
+    protected virtual void OnItemAppearing(AdapterItem item, int position)
     {
         var (realPosition, realItemsCount) = GetRealPositionAndCount(item, position);
 
         if (realItemsCount == 0) return;
 
-        Control.OnItemDisappearing(item, realPosition, realItemsCount);
+        Control.OnItemAppearing(item.Data, realPosition, realItemsCount);
     }
 
-    public virtual (int RealPosition, int RealItemsCount) GetRealPositionAndCount(object item, int position)
+    protected virtual void OnItemDisappearing(AdapterItem item, int position)
+    {
+        var (realPosition, realItemsCount) = GetRealPositionAndCount(item, position);
+
+        if (realItemsCount == 0) return;
+
+        Control.OnItemDisappearing(item.Data, realPosition, realItemsCount);
+    }
+
+    public virtual (int RealPosition, int RealItemsCount) GetRealPositionAndCount(AdapterItem item, int position)
     {
         var header = HasHeader.ToInt();
 
@@ -390,16 +387,16 @@ public class DataAdapter : IDisposable
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add:
-                OnCollectionChangedAdd(itemsSource, e);
+                OnCollectionChangedAdd(e);
                 break;
             case NotifyCollectionChangedAction.Remove:
-                OnCollectionChangedRemove(itemsSource, e);
+                OnCollectionChangedRemove(e);
                 break;
             case NotifyCollectionChangedAction.Replace:
-                OnCollectionChangedReplace(itemsSource, e);
+                OnCollectionChangedReplace(e);
                 break;
             case NotifyCollectionChangedAction.Move:
-                OnCollectionChangedMove(itemsSource, e);
+                OnCollectionChangedMove(e);
                 break;
             case NotifyCollectionChangedAction.Reset:
                 OnCollectionChangedReset(itemsSource);
@@ -407,17 +404,17 @@ public class DataAdapter : IDisposable
         }
     }
 
-    protected virtual void OnCollectionChangedAdd(IEnumerable? itemsSource, NotifyCollectionChangedEventArgs e)
+    protected virtual void OnCollectionChangedAdd(NotifyCollectionChangedEventArgs e)
     {
         if (e.NewItems?.Count is null or 0) return;
 
         var index = e.NewStartingIndex + HasHeader.ToInt();
 
-        InternalItems.InsertRange(index, e.NewItems.Cast<object>());
+        InternalItems.InsertRange(index, e.NewItems.Cast<object>().Select(d => new AdapterItem(d)));
         NotifyItemRangeInserted(index, e.NewItems.Count);
     }
 
-    protected virtual void OnCollectionChangedRemove(IEnumerable? itemsSource, NotifyCollectionChangedEventArgs e)
+    protected virtual void OnCollectionChangedRemove(NotifyCollectionChangedEventArgs e)
     {
         if (e.OldItems?.Count is null or 0) return;
 
@@ -428,19 +425,19 @@ public class DataAdapter : IDisposable
         NotifyItemRangeRemoved(index, count);
     }
 
-    protected virtual void OnCollectionChangedReplace(IEnumerable? itemsSource, NotifyCollectionChangedEventArgs e)
+    protected virtual void OnCollectionChangedReplace(NotifyCollectionChangedEventArgs e)
     {
         if (e.NewItems?.Count is null or 0 || e.OldItems?.Count is null or 0) return;
 
         var index = e.NewStartingIndex + HasHeader.ToInt();
 
         InternalItems.RemoveRange(index, e.OldItems.Count);
-        InternalItems.InsertRange(index, e.NewItems.Cast<object>());
+        InternalItems.InsertRange(index, e.NewItems.Cast<object>().Select(d => new AdapterItem(d)));
 
         NotifyItemRangeChanged(index, e.OldItems.Count, e.NewItems.Count);
     }
 
-    protected virtual void OnCollectionChangedMove(IEnumerable? itemsSource, NotifyCollectionChangedEventArgs e)
+    protected virtual void OnCollectionChangedMove(NotifyCollectionChangedEventArgs e)
     {
         if (e.NewItems?.Count is null or 0 or > 1 || e.OldItems?.Count is null or 0 or > 1
             || e.NewStartingIndex == e.OldStartingIndex) return;
@@ -455,16 +452,16 @@ public class DataAdapter : IDisposable
 
     protected virtual void OnCollectionChangedReset(IEnumerable? itemsSource)
     {
-        List<object> items = itemsSource is null ? [] : new(itemsSource.Cast<object>());
+        List<AdapterItem> items = itemsSource is null ? [] : new(itemsSource.Cast<object>().Select(d => new AdapterItem(d)));
 
         if (HasHeader)
         {
-            items.Insert(0, Control.Header);
+            items.Insert(0, new HeaderItem(Control.Header));
         }
 
         if (HasFooter)
         {
-            items.Add(Control.Footer);
+            items.Add(new FooterItem(Control.Footer));
         }
 
         InternalItems = items;
@@ -501,7 +498,6 @@ public class DataAdapter : IDisposable
 
         RemoveListenerCollection(Control.ItemsSource);
 
-        Control.PropertyChanging -= Control_PropertyChanging;
         Control.PropertyChanged -= Control_PropertyChanged;
 
         IsDisposed = true;

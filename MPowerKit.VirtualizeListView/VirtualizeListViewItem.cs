@@ -1,4 +1,6 @@
-﻿namespace MPowerKit.VirtualizeListView;
+﻿using static MPowerKit.VirtualizeListView.DataAdapter;
+
+namespace MPowerKit.VirtualizeListView;
 
 public class VirtualizeListViewItem
 {
@@ -15,7 +17,7 @@ public class VirtualizeListViewItem
     public virtual bool IsOnScreen => IntersectsWithScrollVisibleRect();
     public bool IsAttached { get; set; }
     public DataTemplate Template { get; set; }
-    public object BindingContext { get; set; }
+    public AdapterItem AdapterItem { get; set; }
     public CellHolder? Cell
     {
         get => _cell;
@@ -40,7 +42,7 @@ public class VirtualizeListViewItem
 
     public virtual void OnCellSizeChanged()
     {
-        if (Cell?.BindingContext is not null && Cell.BindingContext != BindingContext) return;
+        if (Cell?.BindingContext is not null && Cell.BindingContext != AdapterItem.Data) return;
 
         LayoutManager?.OnItemSizeChanged(this);
     }

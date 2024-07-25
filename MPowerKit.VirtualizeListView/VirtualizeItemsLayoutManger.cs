@@ -4,6 +4,8 @@ using System.Runtime.InteropServices;
 using Microsoft.Maui.Controls.Internals;
 using Microsoft.Maui.Layouts;
 
+using static MPowerKit.VirtualizeListView.DataAdapter;
+
 namespace MPowerKit.VirtualizeListView;
 
 public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
@@ -27,7 +29,10 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
     protected List<(DataTemplate Template, CellHolder Cell)> CachedCells { get; } = [];
 
-    public List<(object Data, int Position)> VisibleItems => LaidOutItems.FindAll(i => i.IsOnScreen && i.IsAttached && i.Cell?.Children[0] is VirtualizeListViewCell).Select(i => (i.BindingContext, i.Position)).ToList();
+    public List<(AdapterItem Data, int Position)> VisibleItems => LaidOutItems
+        .FindAll(i => i.IsOnScreen && i.IsAttached && i.Cell?.Children[0] is VirtualizeListViewCell)
+        .Select(i => (i.AdapterItem, i.Position))
+        .ToList();
 
     protected virtual Size AvailableSpace => GetAvailableSpace();
 
@@ -764,11 +769,11 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         return new Size(Control!.Width - Control.Padding.HorizontalThickness, Control.Height - Control.Padding.VerticalThickness);
     }
 
-    protected virtual VirtualizeListViewItem CreateItemForPosition(IReadOnlyList<object> dataItems, int position)
+    protected virtual VirtualizeListViewItem CreateItemForPosition(IReadOnlyList<AdapterItem> dataItems, int position)
     {
         var item = new VirtualizeListViewItem(this)
         {
-            BindingContext = dataItems[position],
+            AdapterItem = dataItems[position],
             Template = Control!.Adapter.GetTemplate(position),
             Position = position
         };
@@ -790,7 +795,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
         var size =
 #if MACIOS
-            //ios needs this to properly draw pooled cached cell
+            //macios needs this to properly draw pooled cached cell
             (cell as IView).Measure(double.PositiveInfinity, double.PositiveInfinity);
 #else
             GetEstimatedItemSize(item);
