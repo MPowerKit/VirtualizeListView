@@ -405,7 +405,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
         var realGroupItemIndex = e.OldStartingIndex + GetFlattenedGroupIndexOfGroup(group) + HasGroupHeader.ToInt();
 
-        var count = group.Count();
+        var count = e.OldItems.Count;
 
         InternalItems.RemoveRange(realGroupItemIndex, count);
         NotifyItemRangeRemoved(realGroupItemIndex, count);

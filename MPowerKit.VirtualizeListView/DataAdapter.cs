@@ -244,10 +244,8 @@ public class DataAdapter : IDisposable
         return IsOneOf(Control.FooterTemplate, template, position);
     }
 
-    public virtual void OnBindCell(CellHolder holder, int position)
+    public virtual void OnBindCell(CellHolder holder, AdapterItem item, int position)
     {
-        var item = Items[position];
-
         holder.BindingContext = item.Data;
 
         if (holder.Children[0] is not VirtualizeListViewCell cell) return;
@@ -256,9 +254,8 @@ public class DataAdapter : IDisposable
         OnItemAppearing(item, position);
     }
 
-    public virtual void OnCellRecycled(CellHolder holder, int position)
+    public virtual void OnCellRecycled(CellHolder holder, AdapterItem item, int position)
     {
-        var item = Items[position];
         var content = holder.Children[0];
 
         try
