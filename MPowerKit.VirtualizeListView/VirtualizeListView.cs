@@ -215,7 +215,7 @@ public class VirtualizeListView : ScrollView
 #elif WINDOWS
         var scroll = this.Handler?.PlatformView as Microsoft.UI.Xaml.Controls.ScrollViewer;
         scroll?.ChangeView(ScrollX + dx, ScrollY + dy, null, true);
-#else
+#elif ANDROID
         var scroll = this.Handler?.PlatformView as SmoothScrollView;
         scroll?.AdjustScroll(dx, dy);
 #endif

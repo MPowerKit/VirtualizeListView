@@ -10,7 +10,7 @@ public static class BuilderExtensions
             handlers.AddHandler<VirtualizeListView, VirtualizeListViewHandler>();
 #endif
 
-#if !WINDOWS
+#if !WINDOWS && !NET8_0
             handlers.AddHandler<FixedRefreshView, FixedRefreshViewRenderer>();
 #endif
         });
