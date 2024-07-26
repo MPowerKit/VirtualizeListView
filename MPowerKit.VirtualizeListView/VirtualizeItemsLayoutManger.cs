@@ -218,14 +218,15 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
         if (!DoesScrollHaveSize()) return;
 
-        if (Control?.Adapter is null || Control.Adapter.Items.Count == 0) return;
+        if (Control?.Adapter?.ItemsCount is null or 0) return;
 
-        var dataItems = Control.Adapter.Items;
-        var count = dataItems.Count;
+        var count = Control.Adapter.ItemsCount;
+
+        var availableSpace = AvailableSpace;
 
         for (int i = 0; i < count; i++)
         {
-            var item = CreateItemForPosition(dataItems, i);
+            var item = CreateItemForPosition(i);
 
             LaidOutItems.Add(item);
 
@@ -233,13 +234,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
             if (!item.IsOnScreen) continue;
 
-            ReuseCell(item, true);
-
-            Control.Adapter.OnBindCell(item.Cell, item.Position);
-
-            ArrangeItem(LaidOutItems, item, AvailableSpace);
-
-            item.IsAttached = true;
+            ReuseCell(item, true, availableSpace);
         }
 
         CreateCachePool(CachePoolSize);
@@ -335,13 +330,11 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         var firstVisibleItem = itemsToRearrange.FirstOrDefault();
         var prevVisibleCellBounds = firstVisibleItem?.CellBounds ?? new();
 
-        var dataItems = Control.Adapter.Items;
-
         List<VirtualizeListViewItem> newItems = new(e.TotalCount);
 
         for (int index = startingIndex; index < finishIndex; index++)
         {
-            var item = CreateItemForPosition(dataItems, index);
+            var item = CreateItemForPosition(index);
 
             newItems.Add(item);
         }
@@ -457,8 +450,6 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
             throw new ArgumentException("Invalid range");
         }
 
-        var dataItems = Control.Adapter.Items;
-
         var itemsToRemove = CollectionsMarshal.AsSpan(LaidOutItems[start..oldEnd]);
         LaidOutItems.RemoveRange(start, oldCount);
 
@@ -478,7 +469,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
         for (int index = start; index < newEnd; index++)
         {
-            var item = CreateItemForPosition(dataItems, index);
+            var item = CreateItemForPosition(index);
 
             newItems.Add(item);
         }
@@ -537,7 +528,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         var newIndex = e.NewIndex;
         var oldIndex = e.OldIndex;
 
-        if (Control?.Adapter is null || Control.Adapter.Items.Count == 0
+        if (Control?.Adapter?.ItemsCount is null or 0
             || count == 0 || newIndex < 0 || newIndex >= count || oldIndex < 0
             || oldIndex >= count || oldIndex == newIndex)
         {
@@ -635,17 +626,11 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
             if (!item.IsOnScreen || item.IsAttached) continue;
 
-            ReuseCell(item, true);
-
-            reused = true;
-
             var prevBounds = item.Bounds;
 
-            control.Adapter.OnBindCell(item.Cell!, item.Position);
+            ReuseCell(item, true, availableSpace);
 
-            ArrangeItem(LaidOutItems, item, availableSpace);
-
-            item.IsAttached = true;
+            reused = true;
 
             if (item.Bounds == prevBounds) continue;
 
@@ -678,7 +663,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
     {
         if (!item.IsAttached || item.Cell is null) return;
 
-        Control!.Adapter.OnCellRecycled(item.Cell!, item.Position);
+        Control!.Adapter.OnCellRecycled(item.Cell!, item.AdapterItem, item.Position);
         item.IsAttached = false;
 
         CacheCell(item);
@@ -697,7 +682,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         item.Cell = null;
     }
 
-    protected virtual void ReuseCell(VirtualizeListViewItem item, bool createNewIfNoCached)
+    protected virtual void ReuseCell(VirtualizeListViewItem item, bool createNewIfNoCached, Size availableSpace)
     {
         if (item.Cell is not null) return;
 
@@ -713,23 +698,30 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
             cell.TranslationX = 0d;
             cell.TranslationY = 0d;
 #endif
-            return;
+        }
+        else
+        {
+            var freeItem = LaidOutItems.Find(i =>
+                (i.Template as IDataTemplateController).Id == (item.Template as IDataTemplateController).Id
+                && !i.IsAttached && !i.IsOnScreen && i.Cell is not null);
+            if (freeItem is not null)
+            {
+                var cell = freeItem.Cell;
+                freeItem.Cell = null;
+                item.Cell = cell;
+            }
+            else if (createNewIfNoCached)
+            {
+                item.Cell = Control!.Adapter.OnCreateCell(item.Template, item.Position);
+                this.Add(item.Cell);
+            }
         }
 
-        var freeItem = LaidOutItems.Find(i =>
-            (i.Template as IDataTemplateController).Id == (item.Template as IDataTemplateController).Id
-            && !i.IsAttached && !i.IsOnScreen && i.Cell is not null);
-        if (freeItem is not null)
-        {
-            var cell = freeItem.Cell;
-            freeItem.Cell = null;
-            item.Cell = cell;
-        }
-        else if (createNewIfNoCached)
-        {
-            item.Cell = Control!.Adapter.OnCreateCell(item.Template, item.Position);
-            this.Add(item.Cell);
-        }
+        Control!.Adapter.OnBindCell(item.Cell!, item.AdapterItem, item.Position);
+
+        ArrangeItem(LaidOutItems, item, availableSpace);
+
+        item.IsAttached = true;
     }
 
     protected virtual void DrawAndResize()
@@ -769,12 +761,12 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         return new Size(Control!.Width - Control.Padding.HorizontalThickness, Control.Height - Control.Padding.VerticalThickness);
     }
 
-    protected virtual VirtualizeListViewItem CreateItemForPosition(IReadOnlyList<AdapterItem> dataItems, int position)
+    protected virtual VirtualizeListViewItem CreateItemForPosition(int position)
     {
         var item = new VirtualizeListViewItem(this)
         {
-            AdapterItem = dataItems[position],
-            Template = Control!.Adapter.GetTemplate(position),
+            AdapterItem = Control!.Adapter.Items[position],
+            Template = Control.Adapter.GetTemplate(position),
             Position = position
         };
 
