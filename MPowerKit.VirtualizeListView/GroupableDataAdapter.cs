@@ -5,12 +5,12 @@ namespace MPowerKit.VirtualizeListView;
 
 public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(listView)
 {
-    public class GroupItem(object group, object data) : AdapterItem(data)
+    public class GroupItem(IEnumerable group, object data) : AdapterItem(data)
     {
         public object Group { get; set; } = group;
     }
-    public class GroupHeaderItem(object group) : GroupItem(group, group) { }
-    public class GroupFooterItem(object group) : GroupItem(group, group) { }
+    public class GroupHeaderItem(IEnumerable group) : GroupItem(group, group) { }
+    public class GroupFooterItem(IEnumerable group) : GroupItem(group, group) { }
 
     protected IEnumerable<IEnumerable> GroupedItems { get; set; } = [];
 
@@ -393,27 +393,34 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
     {
         if (e.NewItems?.Count is null or 0) return;
 
-        var realGroupItemIndex = e.NewStartingIndex + GetFlattenedGroupIndexOfGroup(group) + HasGroupHeader.ToInt() - HasHeader.ToInt();
+        var realGroupItemIndex = e.NewStartingIndex + GetFlattenedGroupIndexOfGroup(group) + HasGroupHeader.ToInt();
 
-        base.OnCollectionChangedAdd(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, e.NewItems, realGroupItemIndex));
+        InternalItems.InsertRange(realGroupItemIndex, e.NewItems.Cast<object>().Select(d => new GroupItem(group, d)));
+        NotifyItemRangeInserted(realGroupItemIndex, e.NewItems.Count);
     }
 
     protected virtual void GroupItemsRemoved(IEnumerable group, NotifyCollectionChangedEventArgs e)
     {
         if (e.OldItems?.Count is null or 0) return;
 
-        var realGroupItemIndex = e.OldStartingIndex + GetFlattenedGroupIndexOfGroup(group) + HasGroupHeader.ToInt() - HasHeader.ToInt();
+        var realGroupItemIndex = e.OldStartingIndex + GetFlattenedGroupIndexOfGroup(group) + HasGroupHeader.ToInt();
 
-        base.OnCollectionChangedRemove(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, e.OldItems, realGroupItemIndex));
+        var count = group.Count();
+
+        InternalItems.RemoveRange(realGroupItemIndex, count);
+        NotifyItemRangeRemoved(realGroupItemIndex, count);
     }
 
     protected virtual void GroupItemsReplaced(IEnumerable group, NotifyCollectionChangedEventArgs e)
     {
         if (e.NewItems?.Count is null or 0 || e.OldItems?.Count is null or 0) return;
 
-        var realGroupItemIndex = e.NewStartingIndex + GetFlattenedGroupIndexOfGroup(group) + HasGroupHeader.ToInt() - HasHeader.ToInt();
+        var realGroupItemIndex = e.NewStartingIndex + GetFlattenedGroupIndexOfGroup(group) + HasGroupHeader.ToInt();
 
-        base.OnCollectionChangedReplace(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, e.NewItems, e.OldItems, realGroupItemIndex));
+        InternalItems.RemoveRange(realGroupItemIndex, e.OldItems.Count);
+        InternalItems.InsertRange(realGroupItemIndex, e.NewItems.Cast<object>().Select(d => new GroupItem(group, d)));
+
+        NotifyItemRangeChanged(realGroupItemIndex, e.OldItems.Count, e.NewItems.Count);
     }
 
     private void GroupItemsMoved(IEnumerable group, NotifyCollectionChangedEventArgs e)
@@ -424,12 +431,13 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
             return;
         }
 
-        var realGroupStartIndex = GetFlattenedGroupIndexOfGroup(group) + HasGroupHeader.ToInt() - HasHeader.ToInt();
+        var realGroupStartIndex = GetFlattenedGroupIndexOfGroup(group) + HasGroupHeader.ToInt();
 
         var newIndex = e.NewStartingIndex + realGroupStartIndex;
         var oldIndex = e.OldStartingIndex + realGroupStartIndex;
 
-        base.OnCollectionChangedMove(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, e.NewItems[0], newIndex, oldIndex));
+        InternalItems.Move(oldIndex, newIndex);
+        NotifyItemMoved(oldIndex, newIndex);
     }
 
     private void GroupItemsReset(IEnumerable group, NotifyCollectionChangedEventArgs e)
