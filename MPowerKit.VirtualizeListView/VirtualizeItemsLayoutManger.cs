@@ -504,9 +504,10 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
             return;
         }
 
-        // if we replaced items after the first visible item
+        // if there is no any visible item 
+        // or we replaced items after the first visible item
         // so we dont need to adjust the scroll position
-        if (firstVisibleItem.Position < start)
+        if (firstVisibleItem is null || firstVisibleItem.Position < start)
         {
             UpdateItemsLayout(start, false);
             return;
