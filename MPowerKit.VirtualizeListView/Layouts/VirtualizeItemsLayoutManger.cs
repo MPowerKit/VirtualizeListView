@@ -701,6 +701,21 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         return TriggerResizeLayout();
     }
 
+    protected virtual void DrawItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
+    {
+        if (items.Count == 0 || item.Position < 0 || item.Cell is null) return;
+
+        var view = item.Cell;
+#if !ANDROID
+        if (view.TranslationX != view.Item.CellBounds.X ||
+            view.TranslationY != view.Item.CellBounds.Y)
+        {
+            view.TranslationX = view.Item.CellBounds.X;
+            view.TranslationY = view.Item.CellBounds.Y;
+        }
+#endif
+    }
+
     protected virtual bool TriggerResizeLayout()
     {
         Size desiredSize = new();
@@ -747,32 +762,10 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             Position = 0
         };
 
-        var size =
-#if MACIOS
-            //macios needs this to properly draw pooled cached cell
-            (cell as IView).Measure(double.PositiveInfinity, double.PositiveInfinity);
-#else
-            GetEstimatedItemSize(item);
-#endif
-
+        var size = GetEstimatedItemSize(item);
         item.CellBounds = item.Bounds = new(0d, 0d, size.Width, size.Height);
 
         return item;
-    }
-
-    protected virtual void DrawItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
-    {
-        if (items.Count == 0 || item.Position < 0 || item.Cell is null) return;
-
-        var view = item.Cell;
-#if !ANDROID
-        if (view.TranslationX != view.Item.CellBounds.X ||
-            view.TranslationY != view.Item.CellBounds.Y)
-        {
-            view.TranslationX = view.Item.CellBounds.X;
-            view.TranslationY = view.Item.CellBounds.Y;
-        }
-#endif
     }
 
     protected virtual Thickness GetItemMargin(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
@@ -798,8 +791,6 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     #region ILayoutManager
     public virtual Size Measure(double widthConstraint, double heightConstraint)
     {
-        var desiredSize = GetDesiredLayoutSize(widthConstraint, heightConstraint);
-
         var items = CollectionsMarshal.AsSpan((this as IBindableLayout).Children as List<IView>);
         var length = items.Length;
 
@@ -813,8 +804,10 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             if (view.IsCached || !view.Item.IsAttached) continue;
 
             // this triggers item size change when needed
-            var measure = MeasureItem(LaidOutItems, view.Item, availableSpace);
+            MeasureItem(LaidOutItems, view.Item, availableSpace);
         }
+
+        var desiredSize = GetDesiredLayoutSize(widthConstraint, heightConstraint);
 
         return desiredSize;
     }
@@ -834,9 +827,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             var child = items[n];
             var view = child as CellHolder;
 
-#if !MACIOS
             if (view.IsCached || !view.Item.IsAttached) continue;
-#endif
 
             var (x, y) =
 #if ANDROID
@@ -844,8 +835,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 #else
                 (0d, 0d);
 #endif
-
-            var newBounds = new Rect(x, y, view.DesiredSize.Width, view.DesiredSize.Height);
+            var newBounds = new Rect(x, y, view.Item.CellBounds.Width, view.Item.CellBounds.Height);
 
 #if MACIOS
             if (view.Bounds == newBounds) continue;

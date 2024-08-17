@@ -46,9 +46,24 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
 
         var iview = (item.Cell as IView)!;
 
-        return IsOrientation(ScrollOrientation.Vertical)
-            ? iview.Measure(availableSpace.Width, double.PositiveInfinity)
-            : iview.Measure(double.PositiveInfinity, availableSpace.Height);
+        Size measure;
+
+        if (IsOrientation(ScrollOrientation.Vertical))
+        {
+            measure = iview.Measure(availableSpace.Width, double.PositiveInfinity);
+
+            item.CellBounds = new Rect(item.CellBounds.X, item.CellBounds.Y, availableSpace.Width, measure.Height);
+            item.Bounds = new Rect(item.Bounds.X, item.Bounds.Y, availableSpace.Width, measure.Height + item.Margin.VerticalThickness);
+        }
+        else
+        {
+            measure = iview.Measure(double.PositiveInfinity, availableSpace.Height);
+
+            item.CellBounds = new Rect(item.CellBounds.X, item.CellBounds.Y, measure.Width, availableSpace.Height);
+            item.Bounds = new Rect(item.Bounds.X, item.Bounds.Y, measure.Width + item.Margin.HorizontalThickness, availableSpace.Height);
+        }
+
+        return measure;
     }
 
     protected override void ArrangeItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace)
@@ -71,10 +86,10 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
 
             var newAvailableSpace = new Size(availableSpace.Width, availableSpace.Height);
 
-            var request = MeasureItem(items, item, newAvailableSpace);
+            item.CellBounds = new Rect(margin.Left, top + margin.Top, 0d, 0d);
+            item.Bounds = new Rect(0d, top, 0d, 0d);
 
-            item.CellBounds = new Rect(margin.Left, top + margin.Top, newAvailableSpace.Width, request.Height);
-            item.Bounds = new Rect(0d, top, newAvailableSpace.Width, request.Height + margin.VerticalThickness);
+            MeasureItem(items, item, newAvailableSpace);
         }
         else
         {
@@ -82,10 +97,10 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
 
             var newAvailableSpace = new Size(availableSpace.Width, availableSpace.Height);
 
-            var request = MeasureItem(items, item, newAvailableSpace);
+            item.CellBounds = new Rect(left + margin.Left, margin.Top, 0d, 0d);
+            item.Bounds = new Rect(left, 0d, 0d, 0d);
 
-            item.CellBounds = new Rect(left + margin.Left, margin.Top, request.Width, newAvailableSpace.Height);
-            item.Bounds = new Rect(left, 0d, request.Width + margin.HorizontalThickness, newAvailableSpace.Height);
+            MeasureItem(items, item, newAvailableSpace);
         }
     }
 

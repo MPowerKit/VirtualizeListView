@@ -7,8 +7,6 @@ public class CellHolder : Grid
 
     public CellHolder()
     {
-        VerticalOptions = HorizontalOptions = LayoutOptions.Start;
-
         this.SizeChanged += CellHolder_SizeChanged;
     }
 
