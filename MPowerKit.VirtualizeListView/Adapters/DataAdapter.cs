@@ -244,6 +244,11 @@ public class DataAdapter : IDisposable
         return IsOneOf(Control.FooterTemplate, template, position);
     }
 
+    public virtual bool IsSuplementary(int position)
+    {
+        return (HasHeader && position == 0) || (HasFooter && position == ItemsCount - 1);
+    }
+
     public virtual void OnBindCell(CellHolder holder, AdapterItem item, int position)
     {
         holder.BindingContext = item.Data;

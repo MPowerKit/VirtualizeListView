@@ -40,6 +40,10 @@ public class VirtualizeListViewItem
     public Rect Bounds { get; set; }
     public Thickness Margin { get; set; }
 
+    public int Span { get; set; } = 1;
+    public int Row { get; set; }
+    public int Column { get; set; }
+
     public virtual void OnCellSizeChanged()
     {
         if (Cell?.BindingContext is not null && Cell.BindingContext != AdapterItem.Data) return;

@@ -27,6 +27,17 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
         return IsOneOf(Control.GroupFooterTemplate, template, position);
     }
 
+    public override bool IsSuplementary(int position)
+    {
+        var isSuplementary = base.IsSuplementary(position);
+
+        if (isSuplementary) return isSuplementary;
+
+        var item = InternalItems[position];
+
+        return item is GroupHeaderItem or GroupHeaderItem;
+    }
+
     protected override DataTemplate GetItemTemplate(AdapterItem item)
     {
         if (item is GroupHeaderItem groupHeader)

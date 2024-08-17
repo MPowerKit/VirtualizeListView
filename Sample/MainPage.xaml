@@ -77,5 +77,6 @@
         </mpowerkit:VirtualizeListView>
 
         <!--</mpowerkit:FixedRefreshView>-->
+
     </Grid>
 </ContentPage>

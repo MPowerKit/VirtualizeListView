@@ -16,6 +16,15 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
             typeof(LinearItemsLayoutManager));
     #endregion
 
+    protected override Size GetDesiredLayoutSize(double widthConstraint, double heightConstraint)
+    {
+        if (IsOrientation(ScrollOrientation.Both) || LaidOutItems.Count == 0) return new();
+
+        return IsOrientation(ScrollOrientation.Vertical)
+            ? new(widthConstraint, LaidOutItems[^1].Bounds.Bottom)
+            : new(LaidOutItems[^1].Bounds.Right, heightConstraint);
+    }
+
     protected override Size GetEstimatedItemSize(VirtualizeListViewItem item)
     {
         if (IsOrientation(ScrollOrientation.Both) || item.Position < 0) return new();
@@ -58,39 +67,25 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
 
         if (IsOrientation(ScrollOrientation.Vertical))
         {
-            var bottom = prevItemBounds.Bottom;
+            var top = prevItemBounds.Bottom;
 
-            var newAvailableSpace = new Size(availableSpace.Width - margin.HorizontalThickness, availableSpace.Height);
+            var newAvailableSpace = new Size(availableSpace.Width, availableSpace.Height);
 
             var request = MeasureItem(items, item, newAvailableSpace);
 
-            if (item.Cell!.WidthRequest != newAvailableSpace.Width
-                || item.Cell.HeightRequest != AutoSize)
-            {
-                item.Cell!.WidthRequest = newAvailableSpace.Width;
-                item.Cell.HeightRequest = AutoSize;
-            }
-
-            item.CellBounds = new Rect(margin.Left, bottom + margin.Top, newAvailableSpace.Width, request.Height);
-            item.Bounds = new Rect(0d, bottom, newAvailableSpace.Width, request.Height + margin.VerticalThickness);
+            item.CellBounds = new Rect(margin.Left, top + margin.Top, newAvailableSpace.Width, request.Height);
+            item.Bounds = new Rect(0d, top, newAvailableSpace.Width, request.Height + margin.VerticalThickness);
         }
         else
         {
-            var right = prevItemBounds.Right;
+            var left = prevItemBounds.Right;
 
-            var newAvailableSpace = new Size(availableSpace.Width, availableSpace.Height - margin.VerticalThickness);
+            var newAvailableSpace = new Size(availableSpace.Width, availableSpace.Height);
 
             var request = MeasureItem(items, item, newAvailableSpace);
 
-            if (item.Cell!.WidthRequest != AutoSize
-                || item.Cell.HeightRequest != newAvailableSpace.Height)
-            {
-                item.Cell!.HeightRequest = newAvailableSpace.Height;
-                item.Cell.WidthRequest = AutoSize;
-            }
-
-            item.CellBounds = new Rect(right + margin.Left, margin.Top, request.Width, newAvailableSpace.Height);
-            item.Bounds = new Rect(right, 0d, request.Width + margin.HorizontalThickness, newAvailableSpace.Height);
+            item.CellBounds = new Rect(left + margin.Left, margin.Top, request.Width, newAvailableSpace.Height);
+            item.Bounds = new Rect(left, 0d, request.Width + margin.HorizontalThickness, newAvailableSpace.Height);
         }
     }
 
@@ -208,7 +203,7 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
         return needs;
     }
 
-    protected override void AdjustScrollForItemBoundsChange(VirtualizeListViewItem item, Rect prevBounds)
+    protected override void AdjustScrollForItemBoundsChange(VirtualizeListViewItem item, Rect prevCellBounds)
     {
         if (IsOrientation(ScrollOrientation.Both)
             || item.Position == -1) return;
@@ -217,7 +212,7 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
         {
             var bottom = item.Bounds.Bottom;
             var top = item.Bounds.Y + Control!.Padding.Top;
-            var dy = bottom - prevBounds.Bottom;
+            var dy = bottom - prevCellBounds.Bottom;
 
             var scrollY = Control.ScrollY;
 
@@ -229,7 +224,7 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
         {
             var right = item.Bounds.Right;
             var left = item.Bounds.X + Control!.Padding.Left;
-            var dx = right - prevBounds.Right;
+            var dx = right - prevCellBounds.Right;
 
             var scrollX = Control.ScrollX;
 

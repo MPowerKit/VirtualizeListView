@@ -153,6 +153,16 @@ public class VirtualizeListView : ScrollView
                 BindingContext = null
             };
         }
+        else if (ItemsLayout is GridLayout gridLayout)
+        {
+            LayoutManager = new GridItemsLayoutManager()
+            {
+                VerticalItemSpacing = gridLayout.VerticalItemSpacing,
+                HorizontalItemsSpacing = gridLayout.HorizontalItemSpacing,
+                CachePoolSize = gridLayout.InitialCachePoolSize,
+                BindingContext = null
+            };
+        }
     }
 
     public virtual void OnItemAppearing(object item, int realPosition, int realItemsCount)

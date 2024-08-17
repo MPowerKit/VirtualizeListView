@@ -8,7 +8,7 @@ using static MPowerKit.VirtualizeListView.DataAdapter;
 
 namespace MPowerKit.VirtualizeListView;
 
-public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
+public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDisposable
 {
     protected const double AutoSize = -1d;
     protected const double CachedItemsCoords = -1000000d;
@@ -38,7 +38,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
     protected override ILayoutManager CreateLayoutManager()
     {
-        return new ItemsLayoutManager(this);
+        return this;
     }
 
     protected override void OnParentChanging(ParentChangingEventArgs args)
@@ -156,7 +156,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
         if (newSpace == PrevAvailableSpace) return;
 
-        PrevAvailableSpace = GetAvailableSpace();
+        PrevAvailableSpace = newSpace;
 
         if (LaidOutItems.Count == 0)
         {
@@ -166,44 +166,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         else
         {
             RelayoutItems();
-            //PendingAdjustScroll = true;
         }
-
-        //ContentSizeChanging();
-
-        //await content width change
-        //await Task.Yield();
-        //await content height change
-        //await Task.Yield();
-
-        //AdjustScrollPosition();
     }
-
-    //protected bool PendingAdjustScroll { get; set; }
-
-    //protected virtual void ContentSizeChanging()
-    //{
-    //    PrevScrollBeforeSizeChange = new(Control.ScrollX, Control.ScrollY);
-
-    //    PrevContentSize = LayedOutItems.Count == 0 ? new(0d, 0d) : new(Control.ContentSize.Width, Control.ContentSize.Height);
-    //}
-
-    //protected virtual void AdjustScrollPosition()
-    //{
-    //    //if (Items.Count == 0 || !PendingAdjustScroll
-    //    //    || Math.Abs(Math.Round(Control.ContentSize.Height) - Math.Round(PrevContentSize.Height)) <= 1) return;
-
-    //    //PendingAdjustScroll = false;
-
-    //    var newScrollX = PrevScrollBeforeSizeChange.X <= Control.Padding.Left
-    //        ? PrevScrollBeforeSizeChange.X
-    //        : (((PrevScrollBeforeSizeChange.X - Control.Padding.Left) / PrevContentSize.Width * Control.ContentSize.Width) + Control.Padding.Left);
-    //    var newScrollY = PrevScrollBeforeSizeChange.Y <= Control.Padding.Top
-    //        ? PrevScrollBeforeSizeChange.Y
-    //        : (((PrevScrollBeforeSizeChange.Y - Control.Padding.Top) / PrevContentSize.Height * Control.ContentSize.Height) + Control.Padding.Top);
-
-    //    Control.ScrollToAsync(newScrollX, newScrollY, false);
-    //}
 
     /// <summary>
     /// Use only if there was no any items before, or itemtemplate has changed.
@@ -214,7 +178,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         LaidOutItems.Clear();
         CachedCells.Clear();
         this.Clear();
-        ResizeLayout();
+        (this as IView).InvalidateMeasure();
 
         if (!DoesScrollHaveSize()) return;
 
@@ -239,7 +203,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
         CreateCachePool(CachePoolSize);
 
-        DrawAndResize();
+        DrawAndTriggerResize();
     }
 
     protected virtual void CreateCachePool(int poolSize)
@@ -341,10 +305,10 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
         LaidOutItems.InsertRange(startingIndex, newItems);
 
-        RepositionItemsFromIndex(finishIndex);
+        RepositionItemsFromIndex(LaidOutItems, finishIndex);
 
         ShiftItemsConsecutively(LaidOutItems, startingIndex, finishIndex);
-        ShiftAllItems(LaidOutItems, finishIndex, count);
+        ShiftAllItems(LaidOutItems, finishIndex, LaidOutItems.Count);
 
         UpdateItemsLayout(startingIndex, false);
 
@@ -383,7 +347,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
             return;
         }
 
-        RepositionItemsFromIndex(startingIndex);
+        RepositionItemsFromIndex(LaidOutItems, startingIndex);
 
         var itemsToRearrange = LaidOutItems.FindAll(i => i.IsOnScreen && i.IsAttached);
         var firstVisibleItem = itemsToRearrange.FirstOrDefault();
@@ -476,10 +440,10 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
 
         LaidOutItems.InsertRange(start, newItems);
 
-        RepositionItemsFromIndex(newEnd);
+        RepositionItemsFromIndex(LaidOutItems, newEnd);
 
-        ShiftItemsConsecutively(LaidOutItems, start, LaidOutItems.Count);
-        ShiftAllItems(LaidOutItems, newEnd, count);
+        ShiftItemsConsecutively(LaidOutItems, start, newEnd);
+        ShiftAllItems(LaidOutItems, newEnd, LaidOutItems.Count);
 
         // if we replaced items from the beginning
         if (start == 0)
@@ -549,7 +513,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         LaidOutItems.RemoveAt(oldIndex);
         LaidOutItems.Insert(newIndex, itemToMove);
 
-        RepositionItemsFromIndex(start);
+        RepositionItemsFromIndex(LaidOutItems, start);
 
         if ((start < firstVisibleItem.Position && end < firstVisibleItem.Position)
             || (start > lastVisibleItem.Position && end > lastVisibleItem.Position))
@@ -642,21 +606,22 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
             AdjustScrollForItemBoundsChange(item, prevBounds);
         }
 
-        DrawAndResize();
+        var sizeChanged = DrawAndTriggerResize();
 
 #if !MACIOS
-        if (reused) (this as IView).InvalidateMeasure();
+        if (reused && !sizeChanged) (this as IView).InvalidateMeasure();
 #endif
     }
 
-    protected virtual void RepositionItemsFromIndex(int index)
+    protected virtual void RepositionItemsFromIndex(IReadOnlyList<VirtualizeListViewItem> items, int index)
     {
-        if (LaidOutItems.Count == 0 || index < 0 || index >= LaidOutItems.Count) return;
+        var count = items.Count;
 
-        var count = LaidOutItems.Count;
+        if (count == 0 || index < 0 || index >= count) return;
+
         for (int i = index; i < count; i++)
         {
-            LaidOutItems[i].Position = i;
+            items[i].Position = i;
         }
     }
 
@@ -725,7 +690,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         item.IsAttached = true;
     }
 
-    protected virtual void DrawAndResize()
+    protected virtual bool DrawAndTriggerResize()
     {
 #if !ANDROID
         foreach (var item in LaidOutItems.FindAll(i => i.Cell is not null))
@@ -733,28 +698,24 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
             DrawItem(LaidOutItems, item);
         }
 #endif
-
-        ResizeLayout();
+        return TriggerResizeLayout();
     }
 
-    protected virtual void ResizeLayout()
+    protected virtual bool TriggerResizeLayout()
     {
-        if (LaidOutItems.Count == 0)
+        Size desiredSize = new();
+        if (IsOrientation(ScrollOrientation.Vertical))
         {
-            this.WidthRequest = AutoSize;
-            this.HeightRequest = AutoSize;
-            return;
+            desiredSize = GetDesiredLayoutSize(AvailableSpace.Width, double.PositiveInfinity);
         }
 
-        var lastItem = LaidOutItems[^1];
+        if (PrevContentSize == desiredSize) return false;
 
-        Size newSize = new(lastItem.Bounds.Right, lastItem.Bounds.Bottom);
-
-        if (PrevContentSize == newSize) return;
-
-        PrevContentSize = newSize;
+        PrevContentSize = desiredSize;
 
         (this as IView).InvalidateMeasure();
+
+        return true;
     }
 
     protected virtual Size GetAvailableSpace()
@@ -819,19 +780,83 @@ public abstract class VirtualizeItemsLayoutManger : Layout, IDisposable
         return new Thickness();
     }
 
-    protected abstract Size GetEstimatedItemSize(VirtualizeListViewItem item);
-    protected abstract Size MeasureItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace);
-    protected abstract void ArrangeItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace);
-    protected abstract void ShiftAllItems(IReadOnlyList<VirtualizeListViewItem> items, int start, int exclusiveEnd);
-    protected abstract void ShiftItemsConsecutively(IReadOnlyList<VirtualizeListViewItem> items, int start, int exclusiveEnd);
-    protected abstract void AdjustScrollForItemBoundsChange(VirtualizeListViewItem item, Rect prevBounds);
-    protected abstract bool AdjustScrollIfNeeded(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem prevItem, Rect prevBounds);
-
     protected virtual bool IsOrientation(ScrollOrientation orientation)
     {
         return Control!.Orientation == orientation
             || (Control.Orientation == ScrollOrientation.Neither && Control.PrevScrollOrientation == orientation);
     }
+
+    protected abstract Size GetDesiredLayoutSize(double widthConstraint, double heightConstraint);
+    protected abstract Size GetEstimatedItemSize(VirtualizeListViewItem item);
+    protected abstract Size MeasureItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace);
+    protected abstract void ArrangeItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace);
+    protected abstract void ShiftAllItems(IReadOnlyList<VirtualizeListViewItem> items, int start, int exclusiveEnd);
+    protected abstract void ShiftItemsConsecutively(IReadOnlyList<VirtualizeListViewItem> items, int start, int exclusiveEnd);
+    protected abstract void AdjustScrollForItemBoundsChange(VirtualizeListViewItem item, Rect prevCellBounds);
+    protected abstract bool AdjustScrollIfNeeded(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem prevItem, Rect prevCellBounds);
+
+    #region ILayoutManager
+    public virtual Size Measure(double widthConstraint, double heightConstraint)
+    {
+        var desiredSize = GetDesiredLayoutSize(widthConstraint, heightConstraint);
+
+        var items = CollectionsMarshal.AsSpan((this as IBindableLayout).Children as List<IView>);
+        var length = items.Length;
+
+        var availableSpace = AvailableSpace;
+
+        for (int n = 0; n < length; n++)
+        {
+            var child = items[n];
+            var view = child as CellHolder;
+
+            if (view.IsCached || !view.Item.IsAttached) continue;
+
+            // this triggers item size change when needed
+            var measure = MeasureItem(LaidOutItems, view.Item, availableSpace);
+        }
+
+        return desiredSize;
+    }
+
+    public virtual Size ArrangeChildren(Rect bounds)
+    {
+        var padding = Padding;
+
+        var availableWidth = bounds.Width - padding.HorizontalThickness;
+        var availableHeight = bounds.Height - padding.VerticalThickness;
+
+        var items = CollectionsMarshal.AsSpan((this as IBindableLayout).Children as List<IView>);
+        var length = items.Length;
+
+        for (int n = 0; n < length; n++)
+        {
+            var child = items[n];
+            var view = child as CellHolder;
+
+#if !MACIOS
+            if (view.IsCached || !view.Item.IsAttached) continue;
+#endif
+
+            var (x, y) =
+#if ANDROID
+                (view.Item.CellBounds.X, view.Item.CellBounds.Y);
+#else
+                (0d, 0d);
+#endif
+
+            var newBounds = new Rect(x, y, view.DesiredSize.Width, view.DesiredSize.Height);
+
+#if MACIOS
+            if (view.Bounds == newBounds) continue;
+#endif
+
+            child.Arrange(newBounds);
+        }
+
+        return new(availableWidth, availableHeight);
+    }
+    #endregion
 
     #region IDisposable
     protected virtual void Dispose(bool disposing)
