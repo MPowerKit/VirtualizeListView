@@ -246,7 +246,7 @@ public class DataAdapter : IDisposable
 
     public virtual bool IsSuplementary(int position)
     {
-        return (HasHeader && position == 0) || (HasFooter && position == ItemsCount - 1);
+        return InternalItems.ElementAtOrDefault(position) is HeaderItem or FooterItem;
     }
 
     public virtual void OnBindCell(CellHolder holder, AdapterItem item, int position)

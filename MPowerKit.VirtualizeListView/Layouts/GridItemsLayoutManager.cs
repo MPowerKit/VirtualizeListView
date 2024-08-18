@@ -1,5 +1,4 @@
-﻿
-namespace MPowerKit.VirtualizeListView;
+﻿namespace MPowerKit.VirtualizeListView;
 
 public class GridItemsLayoutManager : VirtualizeItemsLayoutManger
 {
@@ -58,54 +57,57 @@ public class GridItemsLayoutManager : VirtualizeItemsLayoutManger
         SetupSpanForItem(LaidOutItems, item);
         SetupRowColumnForItem(LaidOutItems, item);
 
-        var estimatedSize = GetEstimatedItemSize(item);
+        var estimatedSize = GetEstimatedItemSize(item, AvailableSpace);
         item.CellBounds = item.Bounds = new(0d, 0d, estimatedSize.Width, estimatedSize.Height);
 
         return item;
     }
 
-    protected virtual void SetupSpanForItem(IReadOnlyCollection<VirtualizeListViewItem> items, VirtualizeListViewItem item)
+    protected virtual void SetupSpanForItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
     {
         if (IsOrientation(ScrollOrientation.Both) || item.Position < 0) return;
 
-        var isSuplementary = Control!.Adapter.IsSuplementary(item.Position);
-
-        if (isSuplementary)
-        {
-            item.Span = Span;
-        }
+        item.Span = Control!.Adapter.IsSuplementary(item.Position) ? Span : 1;
     }
 
-    protected virtual void SetupRowColumnForItem(IReadOnlyCollection<VirtualizeListViewItem> items, VirtualizeListViewItem item)
+    protected virtual void SetupRowColumnForItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
     {
         if (IsOrientation(ScrollOrientation.Both) || item.Position < 0) return;
 
-        var prevItem = items.LastOrDefault() ?? new VirtualizeListViewItem(this);
+        var prevIndex = item.Position - 1;
+        var prevItem = prevIndex == -1 ? null : items[prevIndex];
+
+        if (prevItem is null)
+        {
+            item.Column = 0;
+            item.Row = 0;
+            return;
+        }
 
         if (IsOrientation(ScrollOrientation.Vertical))
         {
-            var lastColumnIndex = (prevItem.Column + 1) * prevItem.Span;
-            if (lastColumnIndex + item.Span > Span)
+            var newColumn = prevItem.Column + prevItem.Span;
+            if (newColumn + item.Span > Span)
             {
                 item.Column = 0;
                 item.Row = prevItem.Row + 1;
                 return;
             }
 
-            item.Column = lastColumnIndex;
+            item.Column = newColumn;
             item.Row = prevItem.Row;
         }
         else
         {
-            var lastRowIndex = (prevItem.Row + 1) * prevItem.Span;
-            if (lastRowIndex + item.Span > Span)
+            var newRow = prevItem.Row + prevItem.Span;
+            if (newRow + item.Span > Span)
             {
                 item.Row = 0;
                 item.Column = prevItem.Column + 1;
                 return;
             }
 
-            item.Row = lastRowIndex;
+            item.Row = newRow;
             item.Column = prevItem.Column;
         }
     }
@@ -124,6 +126,64 @@ public class GridItemsLayoutManager : VirtualizeItemsLayoutManger
         }
     }
 
+    protected override Size MeasureItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace)
+    {
+        if (IsOrientation(ScrollOrientation.Both)
+            || items.Count == 0 || item.Position == -1) return new();
+
+        var iview = (item.Cell as IView)!;
+
+        var direction = GetItemsFullDirection(items, item).FindAll(i => i.Cell?.WasMeasured is true);
+
+        Size measure, size;
+
+        if (IsOrientation(ScrollOrientation.Vertical))
+        {
+            var availableWidth = GetEstimatedItemSize(item, availableSpace).Width;
+
+            measure = iview.Measure(availableWidth, double.PositiveInfinity);
+
+            double biggestHeight = measure.Height;
+            if (direction.Count > 0)
+            {
+                biggestHeight = Math.Max(direction.Max(i => (i.Cell as IView)!.Measure(i.CellBounds.Width, double.PositiveInfinity).Height), measure.Height);
+
+                foreach (var di in direction.FindAll(i => i.CellBounds.Height < biggestHeight))
+                {
+                    di.CellBounds = new(di.CellBounds.X, di.CellBounds.Y, di.CellBounds.Width, biggestHeight);
+                    di.Bounds = new(di.Bounds.X, di.Bounds.Y, di.Bounds.Width, biggestHeight + di.Margin.VerticalThickness);
+                }
+            }
+
+            size = new(availableWidth, biggestHeight);
+        }
+        else
+        {
+            var availableHeight = GetEstimatedItemSize(item, availableSpace).Height;
+
+            measure = iview.Measure(double.PositiveInfinity, availableHeight);
+
+            double biggestWidth = measure.Width;
+            if (direction.Count > 0)
+            {
+                biggestWidth = Math.Max(direction.Max(i => (i.Cell as IView)!.Measure(double.PositiveInfinity, i.CellBounds.Height).Width), measure.Width);
+
+                foreach (var di in direction.FindAll(i => i.CellBounds.Width < biggestWidth))
+                {
+                    di.CellBounds = new(di.CellBounds.X, di.CellBounds.Y, biggestWidth, di.CellBounds.Height);
+                    di.Bounds = new(di.Bounds.X, di.Bounds.Y, biggestWidth + di.Margin.HorizontalThickness, di.Bounds.Height);
+                }
+            }
+
+            size = new(biggestWidth, availableHeight);
+        }
+
+        item.CellBounds = new(item.CellBounds.X, item.CellBounds.Y, size.Width, size.Height);
+        item.Bounds = new(item.Bounds.X, item.Bounds.Y, size.Width + item.Margin.HorizontalThickness, size.Height + item.Margin.VerticalThickness);
+
+        return measure;
+    }
+
     protected override void ArrangeItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace)
     {
         var count = items.Count;
@@ -139,64 +199,32 @@ public class GridItemsLayoutManager : VirtualizeItemsLayoutManger
 
         item.Margin = margin;
 
-        var direction = GetItemsFullDirection(items, item);
+        double top = 0d;
+        double left = 0d;
 
         if (IsOrientation(ScrollOrientation.Vertical))
         {
-            var availableWidth = item.Span * ((availableSpace.Width - (HorizontalItemsSpacing * (Span - 1))) / Span) + HorizontalItemsSpacing * (item.Span - 1);
-
-            var newAvailableSpace = new Size(availableWidth, availableSpace.Height);
-
-            var request = MeasureItem(items, item, newAvailableSpace);
-
-            var top = prevItem?.Row == item.Row ? prevItemBounds.Top : prevItemBounds.Bottom;
-
-            if (direction.Count == 0 || (direction.Count == 1 && direction[0] == item))
+            if (prevItem?.Row == item.Row)
             {
-                if (item.Cell!.WidthRequest != newAvailableSpace.Width
-                    || item.Cell.HeightRequest != AutoSize)
-                {
-                    item.Cell!.WidthRequest = newAvailableSpace.Width;
-                    item.Cell.HeightRequest = AutoSize;
-                }
-
-                item.CellBounds = new Rect(margin.Left, top + margin.Top, newAvailableSpace.Width, request.Height);
-                item.Bounds = new Rect(0d, top, newAvailableSpace.Width, request.Height + margin.VerticalThickness);
-
-                return;
+                top = prevItemBounds.Top;
+                left = prevItemBounds.Right;
             }
-
-            if (request.Height > direction[0].CellBounds.Height)
-            {
-                //foreach (var rowItem in direction.FindAll())
-                //{
-
-                //}
-            }
-
-            var biggestItem = direction.MaxBy(static x => x.CellBounds.Height);
-
-
-
+            else top = prevItemBounds.Bottom;
         }
         else
         {
-            var right = prevItemBounds.Right;
-
-            var newAvailableSpace = new Size(availableSpace.Width, availableSpace.Height - margin.VerticalThickness);
-
-            var request = MeasureItem(items, item, newAvailableSpace);
-
-            if (item.Cell!.WidthRequest != AutoSize
-                || item.Cell.HeightRequest != newAvailableSpace.Height)
+            if (prevItem?.Column == item.Column)
             {
-                item.Cell!.HeightRequest = newAvailableSpace.Height;
-                item.Cell.WidthRequest = AutoSize;
+                top = prevItemBounds.Bottom;
+                left = prevItemBounds.Left;
             }
-
-            item.CellBounds = new Rect(right + margin.Left, margin.Top, request.Width, newAvailableSpace.Height);
-            item.Bounds = new Rect(right, 0d, request.Width + margin.HorizontalThickness, newAvailableSpace.Height);
+            else left = prevItemBounds.Right;
         }
+
+        item.CellBounds = new(left + margin.Left, top + margin.Top, 0d, 0d);
+        item.Bounds = new(left, top, 0d, 0d);
+
+        MeasureItem(items, item, availableSpace);
     }
 
     protected virtual List<VirtualizeListViewItem> GetItemsFullDirection(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
@@ -206,12 +234,12 @@ public class GridItemsLayoutManager : VirtualizeItemsLayoutManger
         if (IsOrientation(ScrollOrientation.Both)
             || count == 0 || item.Position == -1) return [];
 
-        List<VirtualizeListViewItem> direction = new(Span);
+        List<VirtualizeListViewItem> direction = new(Span - 1);
 
         if (IsOrientation(ScrollOrientation.Vertical))
         {
             var index = item.Position - 1;
-            while (index > 0)
+            while (index >= 0)
             {
                 var prevItem = items[index];
                 if (prevItem.Row != item.Row) break;
@@ -222,7 +250,7 @@ public class GridItemsLayoutManager : VirtualizeItemsLayoutManger
             }
 
             index = item.Position + 1;
-            while (index >= count)
+            while (index < count)
             {
                 var nextItem = items[index];
                 if (nextItem.Row != item.Row) break;
@@ -235,7 +263,7 @@ public class GridItemsLayoutManager : VirtualizeItemsLayoutManger
         else
         {
             var index = item.Position - 1;
-            while (index > 0)
+            while (index >= 0)
             {
                 var prevItem = items[index];
                 if (prevItem.Column != item.Column) break;
@@ -246,7 +274,7 @@ public class GridItemsLayoutManager : VirtualizeItemsLayoutManger
             }
 
             index = item.Position + 1;
-            while (index >= count)
+            while (index < count)
             {
                 var nextItem = items[index];
                 if (nextItem.Column != item.Column) break;
@@ -260,135 +288,211 @@ public class GridItemsLayoutManager : VirtualizeItemsLayoutManger
         return direction;
     }
 
-    protected override Size GetEstimatedItemSize(VirtualizeListViewItem item)
+    protected override Size GetEstimatedItemSize(VirtualizeListViewItem item, Size availableSpace)
     {
         if (IsOrientation(ScrollOrientation.Both) || item.Position < 0) return new();
 
-        if (IsOrientation(ScrollOrientation.Vertical))
-        {
-            return new Size(AvailableSpace.Width / Span * item.Span, EstimatedSize);
-        }
-        else
-        {
-            return new Size(EstimatedSize, AvailableSpace.Height / Span * item.Span);
-        }
+        return IsOrientation(ScrollOrientation.Vertical)
+            ? new(item.Span * ((availableSpace.Width - (HorizontalItemsSpacing * (Span - 1))) / Span) + HorizontalItemsSpacing * (item.Span - 1), EstimatedSize)
+            : new(EstimatedSize, item.Span * ((availableSpace.Height - (VerticalItemSpacing * (Span - 1))) / Span) + VerticalItemSpacing * (item.Span - 1));
     }
 
     protected override Thickness GetItemMargin(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
     {
         if (IsOrientation(ScrollOrientation.Both)
-            || item.Position <= 0) return base.GetItemMargin(items, item);
+            || item.Position <= 0) return new();
+
+        Thickness margin;
 
         if (IsOrientation(ScrollOrientation.Vertical))
         {
-            return new(item.Column > 0 ? HorizontalItemsSpacing : 0d, VerticalItemSpacing, 0d, 0d);
+            margin = item.Row == 0
+                ? new(HorizontalItemsSpacing, 0d, 0d, 0d)
+                : new(item.Column > 0 ? HorizontalItemsSpacing : 0d, VerticalItemSpacing, 0d, 0d);
+            return margin;
         }
         else
         {
-            return new(HorizontalItemsSpacing, item.Row > 0 ? VerticalItemSpacing : 0d, 0d, 0d);
+            margin = item.Column == 0
+               ? new(0d, VerticalItemSpacing, 0d, 0d)
+               : new(HorizontalItemsSpacing, item.Row > 0 ? VerticalItemSpacing : 0d, 0d, 0d);
         }
+
+        return margin;
     }
 
-    protected override Size MeasureItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace)
+    protected override void AdjustScrollForItemBoundsChange(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Rect prevCellBounds)
     {
         if (IsOrientation(ScrollOrientation.Both)
-            || items.Count == 0 || item.Position == -1) return new Size();
+            || item.Position == -1) return;
 
-        var iview = (item.Cell as IView)!;
+        var direction = GetItemsFullDirection(items, item).FindAll(i => i.Cell?.WasMeasured is true);
 
-        return IsOrientation(ScrollOrientation.Vertical)
-            ? iview.Measure(availableSpace.Width, double.PositiveInfinity)
-            : iview.Measure(double.PositiveInfinity, availableSpace.Height);
+        double dx = 0d, dy = 0d;
+
+        if (IsOrientation(ScrollOrientation.Vertical))
+        {
+            double biggestBottom = 0d;
+            if (direction.Count > 0)
+            {
+                biggestBottom = direction.Max(i => i.Bounds.Bottom);
+            }
+
+            var bottom = Math.Max(item.Bounds.Bottom, biggestBottom);
+            var top = item.Bounds.Y + Control!.Padding.Top;
+            dy = bottom - prevCellBounds.Bottom;
+
+            var scrollY = Control.ScrollY;
+
+            if (dy == 0d || (top < (scrollY + Control.Height) && top > scrollY)) return;
+        }
+        else
+        {
+            double biggestRight = 0d;
+            if (direction.Count > 0)
+            {
+                biggestRight = direction.Max(i => i.Bounds.Right);
+            }
+
+            var right = Math.Max(item.Bounds.Right, biggestRight);
+            var left = item.Bounds.X + Control!.Padding.Left;
+            dx = right - prevCellBounds.Right;
+
+            var scrollX = Control.ScrollX;
+
+            if (dx == 0d || (left < (scrollX + Control.Width) && left > scrollX)) return;
+        }
+
+        Control.AdjustScroll(dx, dy);
     }
 
-    protected override void AdjustScrollForItemBoundsChange(VirtualizeListViewItem item, Rect prevBounds)
+    protected override bool AdjustScrollIfNeeded(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Rect prevCellBounds)
     {
+        if (IsOrientation(ScrollOrientation.Both) || item.Position == -1) return false;
 
-    }
-
-    protected override bool AdjustScrollIfNeeded(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem prevItem, Rect prevCellBounds)
-    {
-        if (IsOrientation(ScrollOrientation.Both) || prevItem.Position == -1) return false;
+        var direction = GetItemsFullDirection(items, item).FindAll(i => i.Cell?.WasMeasured is true);
 
         bool needs;
 
+        double dx = 0d, dy = 0d;
+
         if (IsOrientation(ScrollOrientation.Vertical))
         {
-            var dy = prevItem.CellBounds.Bottom - prevCellBounds.Bottom;
+            double biggestBottom = 0d;
+            if (direction.Count > 0)
+            {
+                biggestBottom = direction.Max(i => i.Bounds.Bottom);
+            }
+
+            var bottom = Math.Max(item.Bounds.Bottom, biggestBottom);
+
+            dy = bottom - prevCellBounds.Bottom;
 
             needs = dy != 0d;
             if (!needs) return needs;
-
-            Control!.AdjustScroll(0d, dy);
         }
         else
         {
-            var dx = prevItem.CellBounds.Right - prevCellBounds.Right;
+            double biggestRight = 0d;
+            if (direction.Count > 0)
+            {
+                biggestRight = direction.Max(i => i.Bounds.Right);
+            }
+
+            var right = Math.Max(item.Bounds.Right, biggestRight);
+
+            dx = right - prevCellBounds.Right;
 
             needs = dx != 0d;
             if (!needs) return needs;
-
-            Control!.AdjustScroll(dx, 0d);
         }
+
+        Control!.AdjustScroll(dx, dy);
 
         return needs;
     }
 
-    protected override void ShiftAllItems(IReadOnlyList<VirtualizeListViewItem> items, int start, int exclusiveEnd)
+    protected override void ShiftItemsChunk(IReadOnlyList<VirtualizeListViewItem> items, int start, int exclusiveEnd)
     {
         ShiftItemsConsecutively(items, start, exclusiveEnd);
     }
 
     protected override void ShiftItemsConsecutively(IReadOnlyList<VirtualizeListViewItem> items, int start, int exclusiveEnd)
     {
-        //var count = items.Count;
+        var count = items.Count;
 
-        //if (IsOrientation(ScrollOrientation.Both) || start < 0
-        //    || start >= count || exclusiveEnd <= 0 || exclusiveEnd > count) return;
+        if (IsOrientation(ScrollOrientation.Both) || start < 0
+            || start >= count || exclusiveEnd <= 0 || exclusiveEnd > count) return;
 
-        //var prevIndex = start - 1;
-        //var prevBounds = prevIndex == -1 ? new() : items[prevIndex].Bounds;
+        var prevIndex = start - 1;
+        var prevItem = prevIndex == -1 ? null : items[prevIndex];
+        var prevBounds = prevItem is null ? new() : items[prevIndex].Bounds;
 
-        //if (IsOrientation(ScrollOrientation.Vertical))
-        //{
-        //    for (int i = start; i < exclusiveEnd; i++)
-        //    {
-        //        var item = items[i];
+        if (IsOrientation(ScrollOrientation.Vertical))
+        {
+            for (int i = start; i < exclusiveEnd; i++)
+            {
+                var item = items[i];
 
-        //        var dy = prevBounds.Bottom - item.Bounds.Y;
-        //        if (dy == 0d)
-        //        {
-        //            prevBounds = item.Bounds;
-        //            continue;
-        //        }
+                double dx, dy;
 
-        //        item.CellBounds = new Rect(item.CellBounds.X, item.CellBounds.Y + dy, item.CellBounds.Width, item.CellBounds.Height);
-        //        item.Bounds = new Rect(item.Bounds.X, item.Bounds.Y + dy, item.Bounds.Width, item.Bounds.Height);
+                if (prevItem?.Row != item.Row)
+                {
+                    dx = -item.Bounds.X;
+                    dy = prevBounds.Bottom - item.Bounds.Y;
+                }
+                else
+                {
+                    dx = prevBounds.Right - item.Bounds.X;
+                    dy = prevBounds.Top - item.Bounds.Y;
+                }
 
-        //        prevBounds = item.Bounds;
-        //    }
-        //}
-        //else
-        //{
-        //    for (int i = start; i < exclusiveEnd; i++)
-        //    {
-        //        var item = items[i];
+                if (dy == 0d && dx == 0)
+                {
+                    prevBounds = item.Bounds;
+                    prevItem = item;
+                    continue;
+                }
 
-        //        var dx = prevBounds.Right - item.Bounds.X;
-        //        if (dx == 0d)
-        //        {
-        //            prevBounds = item.Bounds;
-        //            continue;
-        //        }
+                item.CellBounds = new(item.CellBounds.X + dx, item.CellBounds.Y + dy, item.CellBounds.Width, item.CellBounds.Height);
+                item.Bounds = new(item.Bounds.X + dx, item.Bounds.Y + dy, item.Bounds.Width, item.Bounds.Height);
 
-        //        item.CellBounds = new Rect(item.CellBounds.X + dx, item.CellBounds.Y, item.CellBounds.Width, item.CellBounds.Height);
-        //        item.Bounds = new Rect(item.Bounds.X + dx, item.Bounds.Y, item.Bounds.Width, item.Bounds.Height);
-        //    }
-        //}
-    }
+                prevBounds = item.Bounds;
+                prevItem = item;
+            }
+        }
+        else
+        {
+            for (int i = start; i < exclusiveEnd; i++)
+            {
+                var item = items[i];
 
-    protected override Size GetDesiredLayoutSize(double widthConstraint, double heightConstraint)
-    {
-        throw new NotImplementedException();
+                double dx, dy;
+
+                if (prevItem?.Column != item.Column)
+                {
+                    dx = prevBounds.Right - item.Bounds.X;
+                    dy = -item.Bounds.Y;
+                }
+                else
+                {
+                    dx = prevBounds.Right - item.Bounds.X;
+                    dy = prevBounds.Top - item.Bounds.Y;
+                }
+
+                if (dy == 0d && dx == 0)
+                {
+                    prevBounds = item.Bounds;
+                    prevItem = item;
+                    continue;
+                }
+
+                item.CellBounds = new(item.CellBounds.X + dx, item.CellBounds.Y + dy, item.CellBounds.Width, item.CellBounds.Height);
+                item.Bounds = new(item.Bounds.X + dx, item.Bounds.Y + dy, item.Bounds.Width, item.Bounds.Height);
+
+                prevBounds = item.Bounds;
+                prevItem = item;
+            }
+        }
     }
 }

@@ -4,6 +4,15 @@ using MPowerKit.VirtualizeListView;
 
 namespace Sample;
 
+public class ItemsGroup : ObservableRangeCollection<Item>
+{
+    public int Key { get; set; }
+    public ItemsGroup(IEnumerable<Item> items, int key) : base(items)
+    {
+        Key = key;
+    }
+}
+
 public partial class Item : ObservableObject
 {
     [ObservableProperty]
@@ -30,19 +39,19 @@ public partial class MainPage
     private void FillItems()
     {
         var items = new ObservableRangeCollection<Item>();
-        for (int i = 0; i < 50; i++)
+        for (int i = 0; i < 500; i++)
         {
             items.Add(new Item()
             {
                 Id = i,
-                Title = $"This is title for {i}",
-                Description = $"This is the long description for {i}, alsdnhkjadfng askdsn kdag ndfnb ksdfhk adfkj ndkfg akfn bkjdfng kjdfhg kjadfnkjandf kgjankgj",
+                Title = $"{i}",
+                Description = $"This is the long description for {i}",
                 Image = "https://picsum.photos/600",
                 Height = 50
             });
         }
 
-        listView.ItemsSource = items/*.GroupBy(i => (int)(i.Id / 10.0))*/;
+        listView.ItemsSource = items.GroupBy(i => (int)(i.Id / 10.0)).Select(g => new ItemsGroup(g, g.Key));
     }
 
     private async void FixedRefreshView_Refreshing(object sender, EventArgs e)
@@ -65,7 +74,7 @@ public partial class MainPage
             {
                 Id = i + 500,
                 Title = $"This is title for {i + 500}",
-                Description = $"This is the long description for {i + 500}, alsdnhkjadfng askdsn kdag ndfnb ksdfhk adfkj ndkfg akfn bkjdfng kjdfhg kjadfnkjandf kgjankgj",
+                Description = $"This is the long description for {i + 500}",
                 Image = "https://picsum.photos/600",
                 Height = 50
             });

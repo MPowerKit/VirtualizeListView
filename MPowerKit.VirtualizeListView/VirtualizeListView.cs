@@ -159,6 +159,7 @@ public class VirtualizeListView : ScrollView
             {
                 VerticalItemSpacing = gridLayout.VerticalItemSpacing,
                 HorizontalItemsSpacing = gridLayout.HorizontalItemSpacing,
+                Span = gridLayout.Span,
                 CachePoolSize = gridLayout.InitialCachePoolSize,
                 BindingContext = null
             };

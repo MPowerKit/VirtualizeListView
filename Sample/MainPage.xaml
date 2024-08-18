@@ -28,21 +28,25 @@
         <mpowerkit:VirtualizeListView x:Name="listView"
                                       Grid.Row="2"
                                       Padding="15"
-                                      IsGrouped="False">
+                                      IsGrouped="True">
             <mpowerkit:VirtualizeListView.ItemsLayout>
-                <mpowerkit:LinearLayout ItemSpacing="5" />
+                <!--<mpowerkit:LinearLayout ItemSpacing="5" />-->
+                <mpowerkit:GridLayout HorizontalItemSpacing="15"
+                                      Span="3"
+                                      VerticalItemSpacing="15" />
             </mpowerkit:VirtualizeListView.ItemsLayout>
-            <!--<mpowerkit:VirtualizeListView.GroupHeaderTemplate>
-                    <DataTemplate>
-                        <Grid Padding="15"
-                              BackgroundColor="Aqua">
-                            <Label Text="{Binding Key}" />
-                        </Grid>
-                    </DataTemplate>
-                </mpowerkit:VirtualizeListView.GroupHeaderTemplate>-->
+            <mpowerkit:VirtualizeListView.GroupHeaderTemplate>
+                <DataTemplate x:DataType="local:ItemsGroup">
+                    <Grid Padding="15"
+                          BackgroundColor="Aqua">
+                        <Label Text="{Binding Key}"
+                               TextColor="Black" />
+                    </Grid>
+                </DataTemplate>
+            </mpowerkit:VirtualizeListView.GroupHeaderTemplate>
             <mpowerkit:VirtualizeListView.ItemTemplate>
                 <DataTemplate x:DataType="local:Item">
-                    <mpowerkit:VirtualizeListViewCell>
+                    <mpowerkit:VirtualizeListViewCell BackgroundColor="Red">
                         <Grid ColumnDefinitions="Auto,*"
                               ColumnSpacing="15"
                               RowDefinitions="Auto,Auto,*"

@@ -40,9 +40,9 @@ public class VirtualizeListViewItem
     public Rect Bounds { get; set; }
     public Thickness Margin { get; set; }
 
-    public int Span { get; set; } = 1;
-    public int Row { get; set; }
-    public int Column { get; set; }
+    public int Span { get; set; }
+    public int Row { get; set; } = -1;
+    public int Column { get; set; } = -1;
 
     public virtual void OnCellSizeChanged()
     {
