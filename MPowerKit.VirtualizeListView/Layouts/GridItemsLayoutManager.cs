@@ -266,11 +266,11 @@ public class GridItemsLayoutManager : VirtualizeItemsLayoutManger
 
         if (IsOrientation(ScrollOrientation.Vertical))
         {
-            return new Size(AvailableSpace.Width / Span * item.Span, 200d);
+            return new Size(AvailableSpace.Width / Span * item.Span, EstimatedSize);
         }
         else
         {
-            return new Size(200d, AvailableSpace.Height / Span * item.Span);
+            return new Size(EstimatedSize, AvailableSpace.Height / Span * item.Span);
         }
     }
 

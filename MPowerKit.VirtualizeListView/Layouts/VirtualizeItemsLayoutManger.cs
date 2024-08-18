@@ -12,7 +12,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 {
     protected const double AutoSize = -1d;
     protected const double CachedItemsCoords = -1000000d;
-
+    protected static double EstimatedSize { get; set; } = 200d;
 
     protected ScrollEventArgs PrevScroll { get; set; } = new(0d, 0d, 0d, 0d);
     protected Point PrevScrollBeforeSizeChange { get; set; }
@@ -693,6 +693,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     protected virtual bool DrawAndTriggerResize()
     {
 #if !ANDROID
+        // on Android we must arrange item in real bounds, not using translation
+        // issue #5
         foreach (var item in LaidOutItems.FindAll(i => i.Cell is not null))
         {
             DrawItem(LaidOutItems, item);
@@ -706,7 +708,10 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         if (items.Count == 0 || item.Position < 0 || item.Cell is null) return;
 
         var view = item.Cell;
+
 #if !ANDROID
+        // on Android we must arrange item in real bounds, not using translation
+        // issue #5
         if (view.TranslationX != view.Item.CellBounds.X ||
             view.TranslationY != view.Item.CellBounds.Y)
         {
@@ -801,8 +806,20 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             var child = items[n];
             var view = child as CellHolder;
 
-            if (view.IsCached || !view.Item.IsAttached) continue;
+            if ((view.IsCached || !view.Item.IsAttached)
+#if MACIOS
+                // on Mac and iOS we must to do initial measure of not measured items
+                && view.WasMeasured
+#endif
+                ) continue;
 
+#if MACIOS
+            if (!view.WasMeasured && view.Item is null)
+            {
+                child.Measure(double.PositiveInfinity, double.PositiveInfinity);
+            }
+            else
+#endif
             // this triggers item size change when needed
             MeasureItem(LaidOutItems, view.Item, availableSpace);
         }
@@ -827,17 +844,32 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             var child = items[n];
             var view = child as CellHolder;
 
-            if (view.IsCached || !view.Item.IsAttached) continue;
+            if ((view.IsCached || !view.Item.IsAttached)
+#if MACIOS
+                // on Mac and iOS we must to do initial arrange of not arranged items
+                && view.WasArranged
+#endif
+                ) continue;
 
             var (x, y) =
 #if ANDROID
+                // on Android we must arrange item in real bounds, not using translation
+                // issue #5
                 (view.Item.CellBounds.X, view.Item.CellBounds.Y);
 #else
                 (0d, 0d);
 #endif
-            var newBounds = new Rect(x, y, view.Item.CellBounds.Width, view.Item.CellBounds.Height);
+
+            var newBounds = new Rect(x, y,
+#if MACIOS
+                view.Item?.CellBounds.Width ?? view.DesiredSize.Width,
+                view.Item?.CellBounds.Height ?? view.DesiredSize.Height);
+#else
+                view.Item.CellBounds.Width, view.Item.CellBounds.Height);
+#endif
 
 #if MACIOS
+            // on other platforms we need to arrange items anyway
             if (view.Bounds == newBounds) continue;
 #endif
 

@@ -31,11 +31,11 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
 
         if (IsOrientation(ScrollOrientation.Vertical))
         {
-            return new Size(AvailableSpace.Width, 200d);
+            return new Size(AvailableSpace.Width, EstimatedSize);
         }
         else
         {
-            return new Size(200d, AvailableSpace.Height);
+            return new Size(EstimatedSize, AvailableSpace.Height);
         }
     }
 
