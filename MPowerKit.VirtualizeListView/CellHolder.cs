@@ -19,13 +19,10 @@ public class CellHolder : Grid
         return base.MeasureOverride(widthConstraint, heightConstraint);
     }
 
-    public CellHolder()
+    protected override void OnSizeAllocated(double width, double height)
     {
-        this.SizeChanged += CellHolder_SizeChanged;
-    }
+        base.OnSizeAllocated(width, height);
 
-    private void CellHolder_SizeChanged(object? sender, EventArgs e)
-    {
         Item?.OnCellSizeChanged();
     }
 }

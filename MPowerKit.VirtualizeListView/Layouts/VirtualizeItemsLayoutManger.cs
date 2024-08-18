@@ -804,9 +804,9 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         for (int n = 0; n < length; n++)
         {
             var child = items[n];
-            var view = child as CellHolder;
+            var view = (child as CellHolder)!;
 
-            if ((view.IsCached || !view.Item.IsAttached)
+            if ((view.IsCached || !view.Item!.IsAttached)
 #if MACIOS
                 // on Mac and iOS we must to do initial measure of not measured items
                 && view.WasMeasured
@@ -821,7 +821,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             else
 #endif
             // this triggers item size change when needed
-            MeasureItem(LaidOutItems, view.Item, availableSpace);
+            MeasureItem(LaidOutItems, view.Item!, availableSpace);
         }
 
         var desiredSize = GetDesiredLayoutSize(widthConstraint, heightConstraint);
@@ -842,9 +842,9 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         for (int n = 0; n < length; n++)
         {
             var child = items[n];
-            var view = child as CellHolder;
+            var view = (child as CellHolder)!;
 
-            if ((view.IsCached || !view.Item.IsAttached)
+            if ((view.IsCached || !view.Item!.IsAttached)
 #if MACIOS
                 // on Mac and iOS we must to do initial arrange of not arranged items
                 && view.WasArranged
