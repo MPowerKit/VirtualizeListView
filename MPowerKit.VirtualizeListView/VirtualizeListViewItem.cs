@@ -4,6 +4,8 @@ namespace MPowerKit.VirtualizeListView;
 
 public class VirtualizeListViewItem
 {
+    private CellHolder _cell;
+
     protected VirtualizeItemsLayoutManger LayoutManager { get; set; }
 
     public VirtualizeListViewItem(VirtualizeItemsLayoutManger layoutManager)
@@ -11,11 +13,9 @@ public class VirtualizeListViewItem
         LayoutManager = layoutManager;
     }
 
-    private CellHolder _cell;
-
     public int Position { get; set; } = -1;
     public virtual bool IsOnScreen => IntersectsWithScrollVisibleRect();
-    public bool IsAttached { get; set; }
+    public bool IsAttached => Cell?.Attached ?? false;
     public DataTemplate Template { get; set; }
     public AdapterItem AdapterItem { get; set; }
     public CellHolder? Cell
@@ -36,8 +36,13 @@ public class VirtualizeListViewItem
             }
         }
     }
-    public Rect CellBounds { get; set; }
-    public Rect Bounds { get; set; }
+
+    public Size Size { get; set; }
+    public Point LeftTopWithMargin { get; set; }
+    public Rect Bounds => new(Margin.Left + LeftTopWithMargin.X, Margin.Top + LeftTopWithMargin.Y, Size.Width, Size.Height);
+    public Point LeftTop => new(Bounds.Left, Bounds.Top);
+    public Point RightBottom => new(Bounds.Right, Bounds.Bottom);
+    public Point RightBottomWithMargin => new(RightBottom.X + Margin.Right, RightBottom.Y + Margin.Bottom);
     public Thickness Margin { get; set; }
 
     public int Span { get; set; }
@@ -55,13 +60,13 @@ public class VirtualizeListViewItem
     {
         var control = LayoutManager.Control;
 
-        var itemBoundsWithCollectionPadding = new Rect(
-            CellBounds.X + control.Padding.Left,
-            CellBounds.Y + control.Padding.Top,
-            CellBounds.Width,
-            CellBounds.Height);
+        Rect itemBoundsWithCollectionPadding = new(
+            Bounds.X + control.Padding.Left,
+            Bounds.Y + control.Padding.Top,
+            Bounds.Width,
+            Bounds.Height);
 
-        var visibleRect = new Rect(control.ScrollX, control.ScrollY, control.Width, control.Height);
+        Rect visibleRect = new(control.ScrollX, control.ScrollY, control.Width, control.Height);
 
         return itemBoundsWithCollectionPadding.IntersectsWith(visibleRect);
     }

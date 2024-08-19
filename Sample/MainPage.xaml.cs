@@ -51,7 +51,7 @@ public partial class MainPage
             });
         }
 
-        listView.ItemsSource = items.GroupBy(i => (int)(i.Id / 10.0)).Select(g => new ItemsGroup(g, g.Key));
+        listView.ItemsSource = items;//.GroupBy(i => (int)(i.Id / 10.0)).Select(g => new ItemsGroup(g, g.Key));
     }
 
     private async void FixedRefreshView_Refreshing(object sender, EventArgs e)
@@ -80,7 +80,7 @@ public partial class MainPage
             });
         }
 
-        source.InsertRange(1, list);
+        source.InsertRange(0, list);
     }
 
     private void Button_Clicked_Remove(object sender, EventArgs e)

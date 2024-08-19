@@ -25,6 +25,45 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
             : new(EstimatedSize, availableSpace.Height);
     }
 
+    protected override Thickness GetItemMargin(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
+    {
+        if (IsOrientation(ScrollOrientation.Both)
+            || item.Position <= 0) return new();
+
+        return IsOrientation(ScrollOrientation.Vertical)
+            ? new(0d, ItemSpacing, 0d, 0d)
+            : new(ItemSpacing, 0d, 0d, 0d);
+    }
+
+    protected override VirtualizeListViewItem CreateItemForPosition(int position)
+    {
+        var item = new VirtualizeListViewItem(this)
+        {
+            AdapterItem = Control!.Adapter.Items[position],
+            Template = Control.Adapter.GetTemplate(position),
+            Position = position
+        };
+
+        item.Margin = GetItemMargin(LaidOutItems, item);
+        item.Size = GetEstimatedItemSize(item, AvailableSpace);
+
+        return item;
+    }
+
+    protected override void RepositionItemsFromIndex(IReadOnlyList<VirtualizeListViewItem> items, int index)
+    {
+        var count = items.Count;
+
+        if (count == 0 || index < 0 || index >= count) return;
+
+        for (int i = index; i < count; i++)
+        {
+            var item = items[i];
+            item.Position = i;
+            item.Margin = GetItemMargin(items, item);
+        }
+    }
+
     protected override Size MeasureItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace)
     {
         if (IsOrientation(ScrollOrientation.Both)
@@ -32,25 +71,20 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
 
         var iview = (item.Cell as IView)!;
 
-        Size measure, size, sizeWithSpacing;
+        Size measure;
 
         if (IsOrientation(ScrollOrientation.Vertical))
         {
             measure = iview.Measure(GetEstimatedItemSize(item, availableSpace).Width, double.PositiveInfinity);
 
-            size = new(availableSpace.Width, measure.Height);
-            sizeWithSpacing = new(size.Width, size.Height + item.Margin.VerticalThickness);
+            item.Size = new(availableSpace.Width, measure.Height);
         }
         else
         {
             measure = iview.Measure(double.PositiveInfinity, GetEstimatedItemSize(item, availableSpace).Height);
 
-            size = new(measure.Width, availableSpace.Height);
-            sizeWithSpacing = new(size.Width + item.Margin.HorizontalThickness, size.Height);
+            item.Size = new(measure.Width, availableSpace.Height);
         }
-
-        item.CellBounds = new(item.CellBounds.X, item.CellBounds.Y, size.Width, size.Height);
-        item.Bounds = new(item.Bounds.X, item.Bounds.Y, sizeWithSpacing.Width, sizeWithSpacing.Height);
 
         return measure;
     }
@@ -63,26 +97,11 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
             || count == 0 || item.Position == -1) return;
 
         var prevIndex = item.Position - 1;
-        var prevItemBounds = prevIndex == -1 ? new() : items[prevIndex].Bounds;
+        var prevItemRightBottom = prevIndex == -1 ? new() : items[prevIndex].RightBottomWithMargin;
 
-        var margin = GetItemMargin(items, item);
-
-        item.Margin = margin;
-
-        double top = 0d;
-        double left = 0d;
-
-        if (IsOrientation(ScrollOrientation.Vertical))
-        {
-            top = prevItemBounds.Bottom;
-        }
-        else
-        {
-            left = prevItemBounds.Right;
-        }
-
-        item.CellBounds = new(left + margin.Left, top + margin.Top, 0d, 0d);
-        item.Bounds = new(left, top, 0d, 0d);
+        item.LeftTopWithMargin = IsOrientation(ScrollOrientation.Vertical)
+            ? new(0d, prevItemRightBottom.Y)
+            : new(prevItemRightBottom.X, 0d);
 
         MeasureItem(items, item, availableSpace);
     }
@@ -96,32 +115,30 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
 
         var item = items[start];
         var prevIndex = start - 1;
-        var prevBounds = prevIndex == -1 ? new() : items[prevIndex].Bounds;
+        var prevItemRightBottom = prevIndex == -1 ? new() : items[prevIndex].RightBottomWithMargin;
 
         if (IsOrientation(ScrollOrientation.Vertical))
         {
-            var dy = prevBounds.Bottom - item.Bounds.Y;
+            var dy = prevItemRightBottom.Y - item.LeftTopWithMargin.Y;
             if (dy == 0d) return;
 
             for (int i = start; i < exclusiveEnd; i++)
             {
                 var currentItem = items[i];
 
-                currentItem.CellBounds = new(currentItem.CellBounds.X, currentItem.CellBounds.Y + dy, currentItem.CellBounds.Width, currentItem.CellBounds.Height);
-                currentItem.Bounds = new(currentItem.Bounds.X, currentItem.Bounds.Y + dy, currentItem.Bounds.Width, currentItem.Bounds.Height);
+                currentItem.LeftTopWithMargin = new(currentItem.LeftTopWithMargin.X, currentItem.LeftTopWithMargin.Y + dy);
             }
         }
         else
         {
-            var dx = prevBounds.Right - item.Bounds.X;
+            var dx = prevItemRightBottom.X - item.LeftTopWithMargin.X;
             if (dx == 0d) return;
 
             for (int i = start; i < exclusiveEnd; i++)
             {
                 var currentItem = items[i];
 
-                currentItem.CellBounds = new(currentItem.CellBounds.X + dx, currentItem.CellBounds.Y, currentItem.CellBounds.Width, currentItem.CellBounds.Height);
-                currentItem.Bounds = new(currentItem.Bounds.X + dx, currentItem.Bounds.Y, currentItem.Bounds.Width, currentItem.Bounds.Height);
+                currentItem.LeftTopWithMargin = new(currentItem.LeftTopWithMargin.X + dx, currentItem.LeftTopWithMargin.Y);
             }
         }
     }
@@ -134,7 +151,7 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
             || start >= count || exclusiveEnd <= 0 || exclusiveEnd > count) return;
 
         var prevIndex = start - 1;
-        var prevBounds = prevIndex == -1 ? new() : items[prevIndex].Bounds;
+        var prevItemRightBottom = prevIndex == -1 ? new() : items[prevIndex].RightBottomWithMargin;
 
         if (IsOrientation(ScrollOrientation.Vertical))
         {
@@ -142,17 +159,9 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
             {
                 var item = items[i];
 
-                var dy = prevBounds.Bottom - item.Bounds.Y;
-                if (dy == 0d)
-                {
-                    prevBounds = item.Bounds;
-                    continue;
-                }
+                item.LeftTopWithMargin = new(item.LeftTopWithMargin.X, prevItemRightBottom.Y);
 
-                item.CellBounds = new(item.CellBounds.X, item.CellBounds.Y + dy, item.CellBounds.Width, item.CellBounds.Height);
-                item.Bounds = new(item.Bounds.X, item.Bounds.Y + dy, item.Bounds.Width, item.Bounds.Height);
-
-                prevBounds = item.Bounds;
+                prevItemRightBottom = item.RightBottomWithMargin;
             }
         }
         else
@@ -161,48 +170,38 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
             {
                 var item = items[i];
 
-                var dx = prevBounds.Right - item.Bounds.X;
-                if (dx == 0d)
-                {
-                    prevBounds = item.Bounds;
-                    continue;
-                }
+                item.LeftTopWithMargin = new(prevItemRightBottom.X, item.LeftTopWithMargin.Y);
 
-                item.CellBounds = new(item.CellBounds.X + dx, item.CellBounds.Y, item.CellBounds.Width, item.CellBounds.Height);
-                item.Bounds = new(item.Bounds.X + dx, item.Bounds.Y, item.Bounds.Width, item.Bounds.Height);
+                prevItemRightBottom = item.RightBottomWithMargin;
             }
         }
     }
 
-    protected override bool AdjustScrollIfNeeded(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Rect prevCellBounds)
+    protected override bool AdjustScrollIfNeeded(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Rect prevBoundsOfItem)
     {
         if (IsOrientation(ScrollOrientation.Both) || item.Position == -1) return false;
-
-        bool needs;
 
         double dx = 0d, dy = 0d;
 
         if (IsOrientation(ScrollOrientation.Vertical))
         {
-            dy = item.CellBounds.Bottom - prevCellBounds.Bottom;
+            dy = item.RightBottom.Y - prevBoundsOfItem.Bottom;
 
-            needs = dy != 0d;
-            if (!needs) return needs;
+            if (dy == 0d) return false;
         }
         else
         {
-            dx = item.CellBounds.Right - prevCellBounds.Right;
+            dx = item.RightBottom.X - prevBoundsOfItem.Right;
 
-            needs = dx != 0d;
-            if (!needs) return needs;
+            if (dx == 0d) return false;
         }
 
         Control!.AdjustScroll(dx, dy);
 
-        return needs;
+        return true;
     }
 
-    protected override void AdjustScrollForItemBoundsChange(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Rect prevCellBounds)
+    protected override void AdjustScrollForItemBoundsChange(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Rect prevBoundsOfItem)
     {
         if (IsOrientation(ScrollOrientation.Both)
             || item.Position == -1) return;
@@ -211,9 +210,9 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
 
         if (IsOrientation(ScrollOrientation.Vertical))
         {
-            var bottom = item.Bounds.Bottom;
-            var top = item.Bounds.Y + Control!.Padding.Top;
-            dy = bottom - prevCellBounds.Bottom;
+            var bottom = item.RightBottom.Y;
+            var top = item.LeftTop.Y + Control!.Padding.Top;
+            dy = bottom - prevBoundsOfItem.Bottom;
 
             var scrollY = Control.ScrollY;
 
@@ -221,9 +220,9 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
         }
         else
         {
-            var right = item.Bounds.Right;
-            var left = item.Bounds.X + Control!.Padding.Left;
-            dx = right - prevCellBounds.Right;
+            var right = item.RightBottom.X;
+            var left = item.LeftTop.X + Control!.Padding.Left;
+            dx = right - prevBoundsOfItem.Right;
 
             var scrollX = Control.ScrollX;
 
@@ -231,15 +230,5 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
         }
 
         Control.AdjustScroll(dx, dy);
-    }
-
-    protected override Thickness GetItemMargin(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
-    {
-        if (IsOrientation(ScrollOrientation.Both)
-            || item.Position <= 0) return new();
-
-        return IsOrientation(ScrollOrientation.Vertical)
-            ? new(0d, ItemSpacing, 0d, 0d)
-            : new(ItemSpacing, 0d, 0d, 0d);
     }
 }

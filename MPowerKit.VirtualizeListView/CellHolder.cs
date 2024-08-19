@@ -6,6 +6,7 @@ public class CellHolder : Grid
     public bool IsCached => Item is null;
     public bool WasArranged { get; protected set; }
     public bool WasMeasured { get; protected set; }
+    public bool Attached { get; set; }
 
     protected override Size ArrangeOverride(Rect bounds)
     {

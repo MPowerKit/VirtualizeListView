@@ -252,6 +252,7 @@ public class DataAdapter : IDisposable
     public virtual void OnBindCell(CellHolder holder, AdapterItem item, int position)
     {
         holder.BindingContext = item.Data;
+        holder.Attached = true;
 
         if (holder.Children[0] is not VirtualizeListViewCell cell) return;
 
@@ -276,6 +277,7 @@ public class DataAdapter : IDisposable
             // theoretically bindingcontext should be nullified
             // but practically performance getting worse if uncommented
             //holder.BindingContext = null;
+            holder.Attached = false;
         }
     }
 

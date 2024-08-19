@@ -292,18 +292,14 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         var itemsToRearrange = LaidOutItems.FindAll(i => i.IsOnScreen && i.IsAttached);
         var firstVisibleItem = itemsToRearrange.FirstOrDefault();
-        var prevVisibleCellBounds = firstVisibleItem?.CellBounds ?? new();
-
-        List<VirtualizeListViewItem> newItems = new(e.TotalCount);
+        var prevVisibleCellBounds = firstVisibleItem?.Bounds ?? new();
 
         for (int index = startingIndex; index < finishIndex; index++)
         {
             var item = CreateItemForPosition(index);
 
-            newItems.Add(item);
+            LaidOutItems.Insert(index, item);
         }
-
-        LaidOutItems.InsertRange(startingIndex, newItems);
 
         RepositionItemsFromIndex(LaidOutItems, finishIndex);
 
@@ -351,7 +347,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         var itemsToRearrange = LaidOutItems.FindAll(i => i.IsOnScreen && i.IsAttached);
         var firstVisibleItem = itemsToRearrange.FirstOrDefault();
-        var prevVisibleCellBounds = firstVisibleItem?.CellBounds ?? new();
+        var prevVisibleCellBounds = firstVisibleItem?.Bounds ?? new();
 
         ShiftItemsChunk(LaidOutItems, startingIndex, LaidOutItems.Count);
 
@@ -427,18 +423,14 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         var itemsToRearrange = LaidOutItems.FindAll(i => i.IsOnScreen && i.IsAttached);
         var firstVisibleItem = itemsToRearrange.FirstOrDefault();
-        var prevVisibleCellBounds = firstVisibleItem?.CellBounds ?? new();
-
-        List<VirtualizeListViewItem> newItems = new(newCount);
+        var prevVisibleCellBounds = firstVisibleItem?.Bounds ?? new();
 
         for (int index = start; index < newEnd; index++)
         {
             var item = CreateItemForPosition(index);
 
-            newItems.Add(item);
+            LaidOutItems.Insert(index, item);
         }
-
-        LaidOutItems.InsertRange(start, newItems);
 
         RepositionItemsFromIndex(LaidOutItems, newEnd);
 
@@ -506,7 +498,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         var itemsToRearrange = LaidOutItems.FindAll(i => i.IsOnScreen && i.IsAttached);
         var firstVisibleItem = itemsToRearrange.First();
         var lastVisibleItem = itemsToRearrange.Last();
-        var prevVisibleCellBounds = firstVisibleItem.CellBounds;
+        var prevVisibleCellBounds = firstVisibleItem.Bounds;
 
         var itemToMove = LaidOutItems[oldIndex];
 
@@ -525,7 +517,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         if (firstVisibleItem == itemToMove)
         {
             firstVisibleItem = itemsToRearrange.FirstOrDefault(i => i != itemToMove);
-            prevVisibleCellBounds = firstVisibleItem?.CellBounds ?? new();
+            prevVisibleCellBounds = firstVisibleItem?.Bounds ?? new();
             itemsToRearrange.Remove(itemToMove);
         }
         else if (lastVisibleItem == itemToMove)
@@ -613,24 +605,11 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 #endif
     }
 
-    protected virtual void RepositionItemsFromIndex(IReadOnlyList<VirtualizeListViewItem> items, int index)
-    {
-        var count = items.Count;
-
-        if (count == 0 || index < 0 || index >= count) return;
-
-        for (int i = index; i < count; i++)
-        {
-            items[i].Position = i;
-        }
-    }
-
     protected virtual void DetachCell(VirtualizeListViewItem item)
     {
         if (!item.IsAttached || item.Cell is null) return;
 
         Control!.Adapter.OnCellRecycled(item.Cell!, item.AdapterItem, item.Position);
-        item.IsAttached = false;
 
         CacheCell(item);
     }
@@ -650,7 +629,11 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected virtual void ReuseCell(VirtualizeListViewItem item, bool createNewIfNoCached, Size availableSpace)
     {
-        if (item.Cell is not null) return;
+        if (item.Cell is not null)
+        {
+            ArrangeItem(LaidOutItems, item, availableSpace);
+            return;
+        }
 
         var freeCell = CachedCells.Find(i => (i.Template as IDataTemplateController).Id == (item.Template as IDataTemplateController).Id);
         if (freeCell != default)
@@ -686,8 +669,6 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         Control!.Adapter.OnBindCell(item.Cell!, item.AdapterItem, item.Position);
 
         ArrangeItem(LaidOutItems, item, availableSpace);
-
-        item.IsAttached = true;
     }
 
     protected virtual bool DrawAndTriggerResize()
@@ -712,11 +693,11 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 #if !ANDROID
         // on Android we must arrange item in real bounds, not using translation
         // issue #5
-        if (view.TranslationX != view.Item.CellBounds.X ||
-            view.TranslationY != view.Item.CellBounds.Y)
+        if (view.TranslationX != item.Bounds.X ||
+            view.TranslationY != item.Bounds.Y)
         {
-            view.TranslationX = view.Item.CellBounds.X;
-            view.TranslationY = view.Item.CellBounds.Y;
+            view.TranslationX = item.Bounds.X;
+            view.TranslationY = item.Bounds.Y;
         }
 #endif
     }
@@ -743,21 +724,6 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         return new Size(Control!.Width - Control.Padding.HorizontalThickness, Control.Height - Control.Padding.VerticalThickness);
     }
 
-    protected virtual VirtualizeListViewItem CreateItemForPosition(int position)
-    {
-        var item = new VirtualizeListViewItem(this)
-        {
-            AdapterItem = Control!.Adapter.Items[position],
-            Template = Control.Adapter.GetTemplate(position),
-            Position = position
-        };
-
-        var estimatedSize = GetEstimatedItemSize(item, AvailableSpace);
-        item.CellBounds = item.Bounds = new(0d, 0d, estimatedSize.Width, estimatedSize.Height);
-
-        return item;
-    }
-
     protected virtual VirtualizeListViewItem CreateDummyItem(DataTemplate template, CellHolder cell)
     {
         var item = new VirtualizeListViewItem(this)
@@ -767,8 +733,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             Position = 0
         };
 
-        var size = GetEstimatedItemSize(item, AvailableSpace);
-        item.CellBounds = item.Bounds = new(0d, 0d, size.Width, size.Height);
+        item.Size = GetEstimatedItemSize(item, AvailableSpace);
 
         return item;
     }
@@ -784,18 +749,20 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         if (IsOrientation(ScrollOrientation.Both) || LaidOutItems.Count == 0) return new();
 
         return IsOrientation(ScrollOrientation.Vertical)
-            ? new(widthConstraint, LaidOutItems[^1].Bounds.Bottom)
-            : new(LaidOutItems[^1].Bounds.Right, heightConstraint);
+            ? new(widthConstraint, LaidOutItems[^1].RightBottomWithMargin.Y)
+            : new(LaidOutItems[^1].RightBottomWithMargin.X, heightConstraint);
     }
 
+    protected abstract void RepositionItemsFromIndex(IReadOnlyList<VirtualizeListViewItem> items, int index);
+    protected abstract VirtualizeListViewItem CreateItemForPosition(int position);
     protected abstract Thickness GetItemMargin(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item);
     protected abstract Size GetEstimatedItemSize(VirtualizeListViewItem item, Size availableSize);
     protected abstract Size MeasureItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace);
     protected abstract void ArrangeItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace);
     protected abstract void ShiftItemsChunk(IReadOnlyList<VirtualizeListViewItem> items, int start, int exclusiveEnd);
     protected abstract void ShiftItemsConsecutively(IReadOnlyList<VirtualizeListViewItem> items, int start, int exclusiveEnd);
-    protected abstract void AdjustScrollForItemBoundsChange(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Rect prevCellBounds);
-    protected abstract bool AdjustScrollIfNeeded(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Rect prevCellBounds);
+    protected abstract void AdjustScrollForItemBoundsChange(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Rect prevBoundsOfItem);
+    protected abstract bool AdjustScrollIfNeeded(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Rect prevBoundsOfItem);
 
     #region ILayoutManager
     public virtual Size Measure(double widthConstraint, double heightConstraint)
@@ -855,22 +822,18 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 #endif
                 ) continue;
 
-            var (x, y) =
+            Point loc =
 #if ANDROID
                 // on Android we must arrange item in real bounds, not using translation
                 // issue #5
-                (view.Item.CellBounds.X, view.Item.CellBounds.Y);
+                view.Item.LeftTop;
 #else
-                (0d, 0d);
+                new(0d, 0d);
 #endif
 
-            Rect newBounds = new(x, y,
-#if MACIOS
-                view.Item?.CellBounds.Width ?? view.DesiredSize.Width,
-                view.Item?.CellBounds.Height ?? view.DesiredSize.Height);
-#else
-                view.Item.CellBounds.Width, view.Item.CellBounds.Height);
-#endif
+            Size size = view.Item?.Size ?? new(view.DesiredSize.Width, view.DesiredSize.Height);
+
+            Rect newBounds = new(loc, size);
 
 #if MACIOS
             // on other platforms we need to arrange items anyway
