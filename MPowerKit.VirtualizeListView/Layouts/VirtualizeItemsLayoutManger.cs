@@ -1,5 +1,4 @@
-﻿using System.ComponentModel;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
 using Microsoft.Maui.Controls.Internals;
 using Microsoft.Maui.Layouts;
@@ -19,7 +18,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     protected Size PrevContentSize { get; set; }
     protected Size PrevAvailableSpace { get; set; }
 
-    public VirtualizeListView? Control { get; protected set; }
+    public VirtualizeListView? ListView { get; protected set; }
+    public DataAdapter? Adapter { get; protected set; }
     public int CachePoolSize { get; set; }
     public bool IsDisposed { get; protected set; }
 
@@ -45,9 +45,9 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     {
         base.OnParentChanging(args);
 
-        UnsubscribeFromEvents();
+        SendListViewAdapterReset();
 
-        Control = null;
+        ListView = null;
     }
 
     protected override void OnParentChanged()
@@ -61,97 +61,61 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             throw new InvalidOperationException("ItemsLayoutManager can be used only within VirtualizeListView");
         }
 
-        Control = listView;
+        ListView = listView;
 
-        SubscribeToEvents();
+        SendListViewAdapterSet();
     }
 
-    protected virtual void UnsubscribeFromEvents()
+    protected virtual bool DoesListViewHaveSize()
     {
-        if (Control is null) return;
-
-        OnAdapterReset();
-
-        Control.PropertyChanging -= Control_PropertyChanging;
-        Control.PropertyChanged -= Control_PropertyChanged;
-        Control.SizeChanged -= Control_SizeChanged;
-        Control.Scrolled -= Control_Scrolled;
+        return ListView is not null && !double.IsNaN(ListView.Width) && !double.IsNaN(ListView.Height) && ListView.Width >= 0d && ListView.Height >= 0d;
     }
 
-    protected virtual void SubscribeToEvents()
+    public virtual void SendListViewAdapterSet()
     {
-        if (Control is null) return;
+        var adapter = ListView?.Adapter;
 
-        Control.PropertyChanging += Control_PropertyChanging;
-        Control.PropertyChanged += Control_PropertyChanged;
-        Control.SizeChanged += Control_SizeChanged;
-        Control.Scrolled += Control_Scrolled;
+        if (adapter is null) return;
 
-        OnAdapterSet();
-    }
+        Adapter = adapter;
 
-    protected virtual bool DoesScrollHaveSize()
-    {
-        return Control is not null && !double.IsNaN(Control.Width) && !double.IsNaN(Control.Height) && Control.Width >= 0d && Control.Height >= 0d;
-    }
-
-    protected virtual void OnAdapterSet()
-    {
-        if (Control?.Adapter is null) return;
-
-        Control.Adapter.DataSetChanged += AdapterDataSetChanged;
-        Control.Adapter.ItemMoved += AdapterItemMoved;
-        Control.Adapter.ItemRangeChanged += AdapterItemRangeChanged;
-        Control.Adapter.ItemRangeInserted += AdapterItemRangeInserted;
-        Control.Adapter.ItemRangeRemoved += AdapterItemRangeRemoved;
+        adapter.DataSetChanged += AdapterDataSetChanged;
+        adapter.ItemMoved += AdapterItemMoved;
+        adapter.ItemRangeChanged += AdapterItemRangeChanged;
+        adapter.ItemRangeInserted += AdapterItemRangeInserted;
+        adapter.ItemRangeRemoved += AdapterItemRangeRemoved;
 
         InvalidateLayout();
     }
 
-    protected virtual void OnAdapterReset()
+    public virtual void SendListViewAdapterReset()
     {
-        if (Control?.Adapter is null) return;
+        var adapter = ListView?.Adapter;
 
-        Control.Adapter.DataSetChanged -= AdapterDataSetChanged;
-        Control.Adapter.ItemMoved -= AdapterItemMoved;
-        Control.Adapter.ItemRangeChanged -= AdapterItemRangeChanged;
-        Control.Adapter.ItemRangeInserted -= AdapterItemRangeInserted;
-        Control.Adapter.ItemRangeRemoved -= AdapterItemRangeRemoved;
+        if (adapter is null) return;
+
+        adapter.DataSetChanged -= AdapterDataSetChanged;
+        adapter.ItemMoved -= AdapterItemMoved;
+        adapter.ItemRangeChanged -= AdapterItemRangeChanged;
+        adapter.ItemRangeInserted -= AdapterItemRangeInserted;
+        adapter.ItemRangeRemoved -= AdapterItemRangeRemoved;
+
+        Adapter = null;
     }
 
-    protected virtual void Control_Scrolled(object? sender, ScrolledEventArgs e)
+    public virtual void SendListViewScrolledScrolled(ScrolledEventArgs e)
     {
+        if (ListView is null) return;
+
         var newScroll = e - PrevScroll;
         UpdateItemsLayout(0, true);
         PrevScroll = newScroll;
     }
 
-    protected virtual void Control_PropertyChanging(object? sender, Microsoft.Maui.Controls.PropertyChangingEventArgs e)
+    public virtual void SendListViewContentSizeChanged()
     {
-        if (e.PropertyName == VirtualizeListView.AdapterProperty.PropertyName)
-        {
-            OnAdapterReset();
-        }
-    }
+        if (ListView is null) return;
 
-    protected virtual void Control_PropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == VirtualizeListView.AdapterProperty.PropertyName)
-        {
-            OnAdapterSet();
-        }
-        //else if (e.PropertyName == VirtualizeListView.ContentSizeProperty.PropertyName)
-        //{
-        //    AdjustScrollPosition();
-        //}
-        else if (e.PropertyName == VirtualizeListView.PaddingProperty.PropertyName)
-        {
-            Control_SizeChanged(Control, EventArgs.Empty);
-        }
-    }
-
-    protected virtual void Control_SizeChanged(object? sender, EventArgs e)
-    {
         var newSpace = GetAvailableSpace();
 
         if (newSpace == PrevAvailableSpace) return;
@@ -180,11 +144,11 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         this.Clear();
         (this as IView).InvalidateMeasure();
 
-        if (!DoesScrollHaveSize()) return;
+        if (!DoesListViewHaveSize()) return;
 
-        if (Control?.Adapter?.ItemsCount is null or 0) return;
+        if (Adapter?.ItemsCount is null or 0) return;
 
-        var count = Control.Adapter.ItemsCount;
+        var count = Adapter.ItemsCount;
 
         var availableSpace = AvailableSpace;
 
@@ -208,9 +172,9 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected virtual void CreateCachePool(int poolSize)
     {
-        if (Control?.Adapter is null || poolSize <= 0) return;
+        if (Adapter is null || poolSize <= 0) return;
 
-        var pool = Control.Adapter.CreateCellsPool(4);
+        var pool = Adapter.CreateCellsPool(4);
 
         for (int i = 0; i < pool.Count; i++)
         {
@@ -226,7 +190,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     protected virtual void RelayoutItems()
     {
         var count = LaidOutItems.Count;
-        if (!DoesScrollHaveSize() || count == 0) return;
+        if (!DoesListViewHaveSize() || count == 0) return;
 
         var attachedItems = LaidOutItems.FindAll(i => i.IsAttached);
 
@@ -246,7 +210,9 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected virtual void AdapterDataSetChanged(object? sender, EventArgs e)
     {
-        if (Control!.Adapter.ItemsCount == 0 && LaidOutItems.Count == 0)
+        var adapter = Adapter!;
+
+        if (adapter.ItemsCount == 0 && LaidOutItems.Count == 0)
         {
             return;
         }
@@ -254,30 +220,30 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         {
             InvalidateLayout();
         }
-        else if (Control!.Adapter.ItemsCount == 0)
+        else if (adapter.ItemsCount == 0)
         {
             AdapterItemRangeRemoved(this, (0, LaidOutItems.Count));
         }
         else if (LaidOutItems.Count > 0)
         {
-            AdapterItemRangeChanged(this, (0, LaidOutItems.Count, Control.Adapter.ItemsCount));
-            if (Control.ScrollX == 0d && Control.ScrollY == 0d) return;
-            Control.ScrollToAsync(0, 0, false);
+            AdapterItemRangeChanged(this, (0, LaidOutItems.Count, adapter.ItemsCount));
+            if (ListView!.ScrollX == 0d && ListView.ScrollY == 0d) return;
+            ListView.ScrollToAsync(0, 0, false);
         }
         else if (LaidOutItems.Count == 0)
         {
-            AdapterItemRangeInserted(this, (0, Control.Adapter.ItemsCount));
+            AdapterItemRangeInserted(this, (0, adapter.ItemsCount));
         }
     }
 
     protected virtual void AdapterItemRangeInserted(object? sender, (int StartingIndex, int TotalCount) e)
     {
-        if (!DoesScrollHaveSize()) return;
+        if (!DoesListViewHaveSize()) return;
 
         var count = LaidOutItems.Count;
         var startingIndex = e.StartingIndex;
 
-        if (Control!.Adapter.ItemsCount == 0 || e.StartingIndex > count)
+        if (Adapter!.ItemsCount == 0 || e.StartingIndex > count)
         {
             throw new ArgumentException("Invalid range");
         }
@@ -318,7 +284,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected virtual void AdapterItemRangeRemoved(object? sender, (int StartingIndex, int TotalCount) e)
     {
-        if (!DoesScrollHaveSize()) return;
+        if (!DoesListViewHaveSize()) return;
 
         var count = LaidOutItems.Count;
         var startingIndex = e.StartingIndex;
@@ -355,14 +321,14 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         if (startingIndex == 0)
         {
             // if we are at the top we dont need to adjust the scroll position
-            if (Control!.ScrollX == 0d && Control.ScrollY == 0d)
+            if (ListView!.ScrollX == 0d && ListView.ScrollY == 0d)
             {
                 UpdateItemsLayout(startingIndex, false);
                 return;
             }
 
             // otherwise we need to adjust the scroll position
-            Control.ScrollToAsync(0d, 0d, false);
+            ListView.ScrollToAsync(0d, 0d, false);
             return;
         }
 
@@ -373,7 +339,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             var prevItem = LaidOutItems[startingIndex - 1];
 
             UpdateItemsLayout(startingIndex, false);
-            AdjustScrollIfNeeded(LaidOutItems, prevItem, new(Control!.ScrollX - Control.Padding.Left, Control.ScrollY - Control.Padding.Top, 0, 0));
+            AdjustScrollIfNeeded(LaidOutItems, prevItem, new(ListView!.ScrollX - ListView.Padding.Left, ListView.ScrollY - ListView.Padding.Top, 0, 0));
             return;
         }
 
@@ -395,7 +361,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected virtual void AdapterItemRangeChanged(object? sender, (int StartingIndex, int OldCount, int NewCount) e)
     {
-        if (!DoesScrollHaveSize()) return;
+        if (!DoesListViewHaveSize()) return;
 
         var count = LaidOutItems.Count;
         var start = e.StartingIndex;
@@ -403,7 +369,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         var newCount = e.NewCount;
         var oldEnd = start + e.OldCount;
         var newEnd = start + e.NewCount;
-        var adapterItemsCount = Control!.Adapter.ItemsCount;
+        var adapterItemsCount = Adapter!.ItemsCount;
 
         if (count == 0 || adapterItemsCount == 0 || start < 0 || oldEnd > count || newEnd > adapterItemsCount)
         {
@@ -441,7 +407,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         if (start == 0)
         {
             // if we are at the top we dont need to adjust the scroll position
-            if (Control!.ScrollX == 0d && Control.ScrollY == 0d)
+            if (ListView!.ScrollX == 0d && ListView.ScrollY == 0d)
             {
                 UpdateItemsLayout(start, false);
                 return;
@@ -456,7 +422,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             }
 
             // otherwise we need to adjust the scroll position
-            Control.ScrollToAsync(0d, 0d, false);
+            ListView.ScrollToAsync(0d, 0d, false);
             return;
         }
 
@@ -479,13 +445,13 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected virtual void AdapterItemMoved(object? sender, (int OldIndex, int NewIndex) e)
     {
-        if (!DoesScrollHaveSize()) return;
+        if (!DoesListViewHaveSize()) return;
 
         var count = LaidOutItems.Count;
         var newIndex = e.NewIndex;
         var oldIndex = e.OldIndex;
 
-        if (Control?.Adapter?.ItemsCount is null or 0
+        if (Adapter?.ItemsCount is null or 0
             || count == 0 || newIndex < 0 || newIndex >= count || oldIndex < 0
             || oldIndex >= count || oldIndex == newIndex)
         {
@@ -544,7 +510,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         }
 
         if (firstVisibleItem is not null && AdjustScrollIfNeeded(LaidOutItems, firstVisibleItem, prevVisibleCellBounds)
-            && (Control.ScrollX != 0d || Control.ScrollY != 0d)) return;
+            && (ListView!.ScrollX != 0d || ListView.ScrollY != 0d)) return;
 
         UpdateItemsLayout(start, false);
     }
@@ -562,7 +528,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         if (count == 0) return;
 
-        var control = Control!;
+        var control = ListView!;
 
         var availableSpace = AvailableSpace;
 
@@ -609,7 +575,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     {
         if (!item.IsAttached || item.Cell is null) return;
 
-        Control!.Adapter.OnCellRecycled(item.Cell!, item.AdapterItem, item.Position);
+        Adapter!.OnCellRecycled(item.Cell!, item.AdapterItem, item.Position);
 
         CacheCell(item);
     }
@@ -661,12 +627,12 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             }
             else if (createNewIfNoCached)
             {
-                item.Cell = Control!.Adapter.OnCreateCell(item.Template, item.Position);
+                item.Cell = Adapter!.OnCreateCell(item.Template, item.Position);
                 this.Add(item.Cell);
             }
         }
 
-        Control!.Adapter.OnBindCell(item.Cell!, item.AdapterItem, item.Position);
+        Adapter!.OnBindCell(item.Cell!, item.AdapterItem, item.Position);
 
         ArrangeItem(LaidOutItems, item, availableSpace);
     }
@@ -721,7 +687,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected virtual Size GetAvailableSpace()
     {
-        return new Size(Control!.Width - Control.Padding.HorizontalThickness, Control.Height - Control.Padding.VerticalThickness);
+        return new Size(ListView!.Width - ListView.Padding.HorizontalThickness, ListView.Height - ListView.Padding.VerticalThickness);
     }
 
     protected virtual VirtualizeListViewItem CreateDummyItem(DataTemplate template, CellHolder cell)
@@ -740,8 +706,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected virtual bool IsOrientation(ScrollOrientation orientation)
     {
-        return Control!.Orientation == orientation
-            || (Control.Orientation == ScrollOrientation.Neither && Control.PrevScrollOrientation == orientation);
+        return ListView!.Orientation == orientation
+            || (ListView.Orientation == ScrollOrientation.Neither && ListView.PrevScrollOrientation == orientation);
     }
 
     protected virtual Size GetDesiredLayoutSize(double widthConstraint, double heightConstraint)
@@ -852,7 +818,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     {
         if (this.IsDisposed) return;
 
-        UnsubscribeFromEvents();
+        SendListViewAdapterReset();
 
         IsDisposed = true;
     }

@@ -58,15 +58,15 @@ public class VirtualizeListViewItem
 
     protected virtual bool IntersectsWithScrollVisibleRect()
     {
-        var control = LayoutManager.Control;
+        var listview = LayoutManager.ListView!;
 
         Rect itemBoundsWithCollectionPadding = new(
-            Bounds.X + control.Padding.Left,
-            Bounds.Y + control.Padding.Top,
+            Bounds.X + listview.Padding.Left,
+            Bounds.Y + listview.Padding.Top,
             Bounds.Width,
             Bounds.Height);
 
-        Rect visibleRect = new(control.ScrollX, control.ScrollY, control.Width, control.Height);
+        Rect visibleRect = new(listview.ScrollX, listview.ScrollY, listview.Width, listview.Height);
 
         return itemBoundsWithCollectionPadding.IntersectsWith(visibleRect);
     }

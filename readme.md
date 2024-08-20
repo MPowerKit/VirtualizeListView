@@ -19,7 +19,7 @@ So, under the hood it is a ```ScrollView``` with custom ```typeof(Layout)``` as 
 ### Implemented features:
 
 - [x] Linear items layout
-- [ ] Grid items layout
+- [x] Grid items layout
 - [x] Items spacing
 - [x] Virtualization
 - [x] Grouping
@@ -63,7 +63,11 @@ and in your xaml just use as a regular ```CollectionView```.
 
 **Note: The root of the ItemTemplate has to be ```typeof(VirtualizeListViewCell)```, but group/header/footer templates are not allowed to have root of this type.**
 
-To change items spacing you need to reset the ```ItemsLayout``` property as next:
+### ItemsLayout
+
+By default VirtualizeListView using ```LinearLayout``` as items layout and it has zero items spacing.
+
+To change items spacing you need to reset the ```ItemsLayout``` property. If you want to use ```LinearLayout```:
 
 ```xaml
 <mpowerkit:VirtualizeListView>
@@ -74,13 +78,57 @@ To change items spacing you need to reset the ```ItemsLayout``` property as next
 </mpowerkit:VirtualizeListView>
 ```
 
-By default it has zero spacing.
+or if you want to use ```GridLayout```:
+
+```xaml
+<mpowerkit:VirtualizeListView>
+	<mpowerkit:VirtualizeListView.ItemsLayout>
+		<mpowerkit:GridLayout HorizontalItemSpacing="15"
+                              Span="3"
+                              VerticalItemSpacing="15" />
+	</mpowerkit:VirtualizeListView.ItemsLayout>
+</mpowerkit:VirtualizeListView>
+```
+
+### Grouping / Header / Footer
+
+if you need to add groups, your ```ItemsSource``` has to be ```typeof(IEnumerable<IEnumerable<>>)```, then you need to set ```IsGrouped="True"``` on ```VirtualizeListView``` and you need to add Group Header/Footer templates as next:
+
+```xaml
+<mpowerkit:VirtualizeListView.GroupHeaderTemplate>
+    <DataTemplate x:DataType="YourGroupType">
+        <Grid Padding="15" >
+            <Label Text="{Binding SomeProperty}" />
+        </Grid>
+    </DataTemplate>
+</mpowerkit:VirtualizeListView.GroupHeaderTemplate>
+```
+
+If you need Header / Footer you need to set data to ```Header``` or ```Footer``` properties of the ```VirtualizeListView```, usually this is just your page's viewmodel, but it can be any data as you want, then you need to declare header/footer template as next:
+
+```xaml
+<mpowerkit:VirtualizeListView.HeaderTemplate>
+    <DataTemplate x:DataType="YourHeaderType">
+        <Grid Padding="15">
+            <Label Text="{Binding SomeProperty}" />
+        </Grid>
+    </DataTemplate>
+</mpowerkit:VirtualizeListView.HeaderTemplate>
+```
+
+### Load more
+
+To enable load more feature you need to set ```ThresholdCommand="{Binding LoadMoreCommand}"```. Also you may set ```RemainingItemsThreshold``` (how many items before the end trigger the ```ThresholdCommand```), by default it is 5.
+
+### Other properties
+
+You may want to know when user taps on cell, for this you have ```ItemTapCommand```, the command parameter is the ```BindingContext``` of the cell.
 
 To change collection orientation just change the ```Orientation``` property of the ```VirtualizeListView``` as  you would do this in ```ScrollView```.
 
 To disable scroll set ```CanScroll``` property to ```false```, and do not change ```Orientation``` property to ```Neither```.
 
-## Other useful features
+## Other useful features of this package
 
 #### ```FixedRefreshView```
 

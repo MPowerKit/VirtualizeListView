@@ -19,11 +19,13 @@ public class VirtualizeListView : ScrollView
 
     public VirtualizeListView()
     {
+        this.Scrolled += VirtualizeListView_Scrolled;
+
         PrevScrollOrientation = Orientation != ScrollOrientation.Neither ? Orientation : ScrollOrientation.Vertical;
 
         Adapter = new GroupableDataAdapter(this);
 
-        OnItemsLayoutSet();
+        OnItemsLayoutChanged();
     }
 
     protected override void OnHandlerChanged()
@@ -39,42 +41,25 @@ public class VirtualizeListView : ScrollView
 
         if (propertyName == AdapterProperty.PropertyName)
         {
-            if (Adapter?.IsDisposed is false)
-            {
-                Adapter.Dispose();
-            }
-        }
-        else if (propertyName == nameof(Parent))
-        {
-            if (Parent is RefreshView refresh)
-            {
-                refresh.PropertyChanged -= Refresh_PropertyChanged;
-            }
+            OnAdapterChanging();
         }
     }
 
-    protected override void OnPropertyChanged([CallerMemberName] string propertyName = null)
+    protected override void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         base.OnPropertyChanged(propertyName);
 
         if (propertyName == ItemsLayoutProperty.PropertyName)
         {
-            OnItemsLayoutSet();
+            OnItemsLayoutChanged();
         }
         else if (propertyName == LayoutManagerProperty.PropertyName)
         {
-            this.Content = LayoutManager;
-        }
-        else if (propertyName == nameof(Parent))
-        {
-            if (Parent is RefreshView refresh)
-            {
-                refresh.PropertyChanged += Refresh_PropertyChanged;
-            }
+            OnLayoutManagerChanged();
         }
         else if (propertyName == ItemTemplateProperty.PropertyName)
         {
-            LayoutManager?.InvalidateLayout();
+            OnItemTemplateChanged();
         }
         else if (propertyName == ScrollSpeedProperty.PropertyName)
         {
@@ -88,38 +73,82 @@ public class VirtualizeListView : ScrollView
 #endif
         else if (propertyName == AdapterProperty.PropertyName)
         {
-            Adapter?.InitCollection(ItemsSource);
+            OnAdapterChanged();
         }
         else if (propertyName == ItemsSourceProperty.PropertyName
             || propertyName == IsGroupedProperty.PropertyName
             || propertyName == GroupHeaderTemplateProperty.PropertyName
             || propertyName == GroupFooterTemplateProperty.PropertyName)
         {
-            Adapter?.ReloadData();
+            ReloadData();
+        }
+        else if (propertyName == HeaderProperty.PropertyName
+            || propertyName == HeaderTemplateProperty.PropertyName)
+        {
+            OnHeaderChanged();
+        }
+        else if (propertyName == FooterProperty.PropertyName
+            || propertyName == FooterTemplateProperty.PropertyName)
+        {
+            OnFooterChanged();
         }
         else if (propertyName == CanScrollProperty.PropertyName)
         {
-            if (!CanScroll)
-            {
-                PrevScrollOrientation = Orientation;
-                Orientation = ScrollOrientation.Neither;
-            }
-            else
-            {
-                Orientation = PrevScrollOrientation;
-            }
+            OnCanScrollChanged();
         }
         else if (propertyName == OrientationProperty.PropertyName)
         {
-            if (Orientation == ScrollOrientation.Neither) return;
-
-            if (PrevScrollOrientation != Orientation)
-            {
-                LayoutManager?.InvalidateLayout();
-            }
-
-            PrevScrollOrientation = Orientation;
+            OnOrientationChanged();
         }
+        else if (propertyName == PaddingProperty.PropertyName)
+        {
+            OnSizeChanged();
+        }
+    }
+
+    protected virtual void OnHeaderChanged()
+    {
+        Adapter?.SendHeaderChanged();
+    }
+
+    protected virtual void OnFooterChanged()
+    {
+        Adapter?.SendFooterChanged();
+    }
+
+    protected virtual void VirtualizeListView_Scrolled(object? sender, ScrolledEventArgs e)
+    {
+        LayoutManager?.SendListViewScrolledScrolled(e);
+    }
+
+    protected virtual void ReloadData()
+    {
+        Adapter?.ReloadData();
+    }
+
+    protected virtual void OnCanScrollChanged()
+    {
+        if (!CanScroll)
+        {
+            PrevScrollOrientation = Orientation;
+            Orientation = ScrollOrientation.Neither;
+        }
+        else
+        {
+            Orientation = PrevScrollOrientation;
+        }
+    }
+
+    protected virtual void OnOrientationChanged()
+    {
+        if (Orientation == ScrollOrientation.Neither) return;
+
+        if (PrevScrollOrientation != Orientation)
+        {
+            LayoutManager?.InvalidateLayout();
+        }
+
+        PrevScrollOrientation = Orientation;
     }
 
     protected virtual void ChangeScrollSpeed()
@@ -128,13 +157,28 @@ public class VirtualizeListView : ScrollView
 
 #if MACIOS
         var scroll = this.Handler?.PlatformView as UIKit.UIScrollView;
-        scroll.DecelerationRate = ScrollSpeed is ScrollSpeed.Normal
+        scroll!.DecelerationRate = ScrollSpeed is ScrollSpeed.Normal
             ? UIKit.UIScrollView.DecelerationRateFast
             : UIKit.UIScrollView.DecelerationRateNormal;
 #endif
     }
 
-    private void Refresh_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    protected override void OnParentChanging(ParentChangingEventArgs args)
+    {
+        base.OnParentChanging(args);
+
+        if (args.OldParent is RefreshView oldRefresh)
+        {
+            oldRefresh.PropertyChanged -= Refresh_PropertyChanged;
+        }
+
+        if (args.NewParent is RefreshView newRefresh)
+        {
+            newRefresh.PropertyChanged += Refresh_PropertyChanged;
+        }
+    }
+
+    protected virtual void Refresh_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == RefreshView.IsRefreshingProperty.PropertyName)
         {
@@ -142,7 +186,17 @@ public class VirtualizeListView : ScrollView
         }
     }
 
-    protected virtual void OnItemsLayoutSet()
+    protected virtual void OnItemTemplateChanged()
+    {
+        LayoutManager?.InvalidateLayout();
+    }
+
+    protected virtual void OnLayoutManagerChanged()
+    {
+        this.Content = LayoutManager;
+    }
+
+    protected virtual void OnItemsLayoutChanged()
     {
         if (ItemsLayout is LinearLayout linearLayout)
         {
@@ -164,6 +218,34 @@ public class VirtualizeListView : ScrollView
                 BindingContext = null
             };
         }
+    }
+
+    protected override void OnSizeAllocated(double width, double height)
+    {
+        base.OnSizeAllocated(width, height);
+
+        OnSizeChanged();
+    }
+
+    protected virtual void OnSizeChanged()
+    {
+        LayoutManager?.SendListViewContentSizeChanged();
+    }
+
+    protected virtual void OnAdapterChanging()
+    {
+        if (Adapter?.IsDisposed is false)
+        {
+            Adapter.Dispose();
+        }
+
+        LayoutManager?.SendListViewAdapterReset();
+    }
+
+    protected virtual void OnAdapterChanged()
+    {
+        Adapter.InitCollection(ItemsSource);
+        LayoutManager?.SendListViewAdapterReset();
     }
 
     public virtual void OnItemAppearing(object item, int realPosition, int realItemsCount)

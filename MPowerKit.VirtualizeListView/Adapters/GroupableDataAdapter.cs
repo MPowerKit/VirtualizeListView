@@ -14,17 +14,17 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
     protected IEnumerable<IEnumerable> GroupedItems { get; set; } = [];
 
-    public virtual bool HasGroupHeader => Control.IsGrouped && Control.GroupHeaderTemplate is not null;
-    public virtual bool HasGroupFooter => Control.IsGrouped && Control.GroupFooterTemplate is not null;
+    public virtual bool HasGroupHeader => ListView.IsGrouped && ListView.GroupHeaderTemplate is not null;
+    public virtual bool HasGroupFooter => ListView.IsGrouped && ListView.GroupFooterTemplate is not null;
 
     public virtual bool IsGroupHeader(DataTemplate template, int position)
     {
-        return IsOneOf(Control.GroupHeaderTemplate, template, position);
+        return IsOneOf(ListView.GroupHeaderTemplate, template, position);
     }
 
     public virtual bool IsGroupFooter(DataTemplate template, int position)
     {
-        return IsOneOf(Control.GroupFooterTemplate, template, position);
+        return IsOneOf(ListView.GroupFooterTemplate, template, position);
     }
 
     public override bool IsSuplementary(int position)
@@ -50,22 +50,22 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
     protected virtual DataTemplate GetGroupHeaderTemplate(object item)
     {
-        if (Control.GroupHeaderTemplate is DataTemplateSelector headerSelector)
+        if (ListView.GroupHeaderTemplate is DataTemplateSelector headerSelector)
         {
-            return headerSelector.SelectTemplate(item, Control);
+            return headerSelector.SelectTemplate(item, ListView);
         }
 
-        return Control.GroupHeaderTemplate;
+        return ListView.GroupHeaderTemplate;
     }
 
     protected virtual DataTemplate GetGroupFooterTemplate(object item)
     {
-        if (Control.GroupFooterTemplate is DataTemplateSelector footerSelector)
+        if (ListView.GroupFooterTemplate is DataTemplateSelector footerSelector)
         {
-            return footerSelector.SelectTemplate(item, Control);
+            return footerSelector.SelectTemplate(item, ListView);
         }
 
-        return Control.GroupFooterTemplate;
+        return ListView.GroupFooterTemplate;
     }
 
     public override List<(CellHolder cell, DataTemplate template)> CreateCellsPool(int poolSize)
@@ -74,13 +74,13 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
         List<DataTemplate> templates = [];
 
-        if (Control.GroupHeaderTemplate is not null)
+        if (ListView.GroupHeaderTemplate is not null)
         {
-            templates.AddRange(GetAllTemplatesByTemplate(Control.GroupHeaderTemplate));
+            templates.AddRange(GetAllTemplatesByTemplate(ListView.GroupHeaderTemplate));
         }
-        if (Control.GroupFooterTemplate is not null)
+        if (ListView.GroupFooterTemplate is not null)
         {
-            templates.AddRange(GetAllTemplatesByTemplate(Control.GroupFooterTemplate));
+            templates.AddRange(GetAllTemplatesByTemplate(ListView.GroupFooterTemplate));
         }
 
         for (int i = 0; i < templates.Count; i++)
@@ -123,7 +123,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
             throw new ArgumentException("GroupFooterTemplate can't be typeof(VirtualizeListViewCell)");
         }
 
-        if (IsOneOf(Control.ItemTemplate, template, position) && content is not VirtualizeListViewCell)
+        if (IsOneOf(ListView.ItemTemplate, template, position) && content is not VirtualizeListViewCell)
         {
             throw new ArgumentException("ItemTemplate has to be typeof(VirtualizeListViewCell)");
         }
@@ -133,7 +133,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
     public override (int RealPosition, int RealItemsCount) GetRealPositionAndCount(AdapterItem item, int position)
     {
-        if (!Control.IsGrouped)
+        if (!ListView.IsGrouped)
         {
             return base.GetRealPositionAndCount(item, position);
         }
@@ -169,7 +169,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
     protected override void RemoveListenerCollection(IEnumerable? itemsSource)
     {
-        if (!Control.IsGrouped || itemsSource is null)
+        if (!ListView.IsGrouped || itemsSource is null)
         {
             base.RemoveListenerCollection(itemsSource);
             return;
@@ -187,7 +187,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
     public override void InitCollection(IEnumerable? itemsSource)
     {
-        if (!Control.IsGrouped || itemsSource is null)
+        if (!ListView.IsGrouped || itemsSource is null)
         {
             base.InitCollection(itemsSource);
             return;
@@ -247,7 +247,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
     protected override void OnCollectionChangedAdd(NotifyCollectionChangedEventArgs e)
     {
-        if (!Control.IsGrouped)
+        if (!ListView.IsGrouped)
         {
             base.OnCollectionChangedAdd(e);
             return;
@@ -265,7 +265,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
     protected override void OnCollectionChangedRemove(NotifyCollectionChangedEventArgs e)
     {
-        if (!Control.IsGrouped)
+        if (!ListView.IsGrouped)
         {
             base.OnCollectionChangedRemove(e);
             return;
@@ -283,7 +283,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
     protected override void OnCollectionChangedReplace(NotifyCollectionChangedEventArgs e)
     {
-        if (!Control.IsGrouped)
+        if (!ListView.IsGrouped)
         {
             base.OnCollectionChangedReplace(e);
             return;
@@ -304,7 +304,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
     protected override void OnCollectionChangedMove(NotifyCollectionChangedEventArgs e)
     {
-        if (!Control.IsGrouped)
+        if (!ListView.IsGrouped)
         {
             base.OnCollectionChangedMove(e);
             return;
@@ -339,7 +339,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
     protected override void OnCollectionChangedReset(IEnumerable? itemsSource)
     {
-        if (!Control.IsGrouped || itemsSource is null)
+        if (!ListView.IsGrouped || itemsSource is null)
         {
             base.OnCollectionChangedReset(itemsSource);
             return;
@@ -356,12 +356,12 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
         if (HasHeader)
         {
-            flattenedItems.Insert(0, new HeaderItem(Control.Header));
+            flattenedItems.Insert(0, new HeaderItem(ListView.Header));
         }
 
         if (HasFooter)
         {
-            flattenedItems.Add(new FooterItem(Control.Footer));
+            flattenedItems.Add(new FooterItem(ListView.Footer));
         }
 
         InternalItems = flattenedItems;

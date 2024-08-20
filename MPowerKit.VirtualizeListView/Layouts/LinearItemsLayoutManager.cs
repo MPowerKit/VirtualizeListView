@@ -39,8 +39,8 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
     {
         var item = new VirtualizeListViewItem(this)
         {
-            AdapterItem = Control!.Adapter.Items[position],
-            Template = Control.Adapter.GetTemplate(position),
+            AdapterItem = Adapter!.Items[position],
+            Template = Adapter.GetTemplate(position),
             Position = position
         };
 
@@ -196,7 +196,7 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
             if (dx == 0d) return false;
         }
 
-        Control!.AdjustScroll(dx, dy);
+        ListView!.AdjustScroll(dx, dy);
 
         return true;
     }
@@ -211,24 +211,24 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
         if (IsOrientation(ScrollOrientation.Vertical))
         {
             var bottom = item.RightBottom.Y;
-            var top = item.LeftTop.Y + Control!.Padding.Top;
+            var top = item.LeftTop.Y + ListView!.Padding.Top;
             dy = bottom - prevBoundsOfItem.Bottom;
 
-            var scrollY = Control.ScrollY;
+            var scrollY = ListView.ScrollY;
 
-            if (dy == 0d || (top < (scrollY + Control.Height) && top > scrollY)) return;
+            if (dy == 0d || (top < (scrollY + ListView.Height) && top > scrollY)) return;
         }
         else
         {
             var right = item.RightBottom.X;
-            var left = item.LeftTop.X + Control!.Padding.Left;
+            var left = item.LeftTop.X + ListView!.Padding.Left;
             dx = right - prevBoundsOfItem.Right;
 
-            var scrollX = Control.ScrollX;
+            var scrollX = ListView.ScrollX;
 
-            if (dx == 0d || (left < (scrollX + Control.Width) && left > scrollX)) return;
+            if (dx == 0d || (left < (scrollX + ListView.Width) && left > scrollX)) return;
         }
 
-        Control.AdjustScroll(dx, dy);
+        ListView.AdjustScroll(dx, dy);
     }
 }
