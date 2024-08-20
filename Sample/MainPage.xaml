@@ -29,12 +29,12 @@
                                       Grid.Row="2"
                                       Padding="15"
                                       IsGrouped="False">
-            <mpowerkit:VirtualizeListView.ItemsLayout>
-                <!--<mpowerkit:LinearLayout ItemSpacing="15" />-->
-                <mpowerkit:GridLayout HorizontalItemSpacing="15"
+            <!--<mpowerkit:VirtualizeListView.ItemsLayout>-->
+            <!--<mpowerkit:LinearLayout ItemSpacing="15" />-->
+            <!--<mpowerkit:GridLayout HorizontalItemSpacing="15"
                                       Span="3"
-                                      VerticalItemSpacing="15" />
-            </mpowerkit:VirtualizeListView.ItemsLayout>
+                                      VerticalItemSpacing="15" />-->
+            <!--</mpowerkit:VirtualizeListView.ItemsLayout>-->
             <!--<mpowerkit:VirtualizeListView.GroupHeaderTemplate>
                 <DataTemplate x:DataType="local:ItemsGroup">
                     <Grid Padding="15"
