@@ -6,13 +6,9 @@
              xmlns:mpowerkit="clr-namespace:MPowerKit.VirtualizeListView;assembly=MPowerKit.VirtualizeListView"
              BackgroundColor="Purple">
 
-    <Grid ColumnDefinitions="*,40"
-          ColumnSpacing="30"
-          RowDefinitions="Auto,50,*">
-        <Entry Grid.ColumnSpan="2"
-               TextChanged="Entry_TextChanged" />
+    <Grid RowDefinitions="Auto,50,*">
+        <Entry TextChanged="Entry_TextChanged" />
         <Grid Grid.Row="1"
-              Grid.ColumnSpan="2"
               ColumnDefinitions="*,*,*,*"
               ColumnSpacing="15">
             <Button Clicked="Button_Clicked_Add"
@@ -28,22 +24,13 @@
                     Text="Move" />
         </Grid>
 
-        <ScrollView Grid.Row="2"
-                    Grid.ColumnSpan="2"
-                    Padding="15"
-                    BackgroundColor="Aqua">
-            <Grid BackgroundColor="Orange" />
-        </ScrollView>
-
         <!--<mpowerkit:FixedRefreshView Grid.Row="1"
                                     Refreshing="FixedRefreshView_Refreshing">-->
         <mpowerkit:VirtualizeListView x:Name="listView"
                                       Grid.Row="2"
-                                      Grid.ColumnSpan="2"
                                       Padding="15"
                                       BackgroundColor="Aqua"
-                                      IsGrouped="False"
-                                      IsVisible="False">
+                                      IsGrouped="False">
             <mpowerkit:VirtualizeListView.Resources>
                 <ResourceDictionary>
                     <Style TargetType="mpowerkit:LinearItemsLayoutManager">

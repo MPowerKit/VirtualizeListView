@@ -55,6 +55,7 @@ public partial class MainPage
     private void FillItems()
     {
         var items = new ObservableRangeCollection<Item>();
+
         for (int i = 0; i < 500; i++)
         {
             items.Add(new Item()

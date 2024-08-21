@@ -470,7 +470,8 @@ public class DataAdapter : IDisposable
     {
         if (!MainThread.IsMainThread)
         {
-            MainThread.BeginInvokeOnMainThread(Notify);
+            //MainThread.BeginInvokeOnMainThread(Notify);
+            throw new InvalidOperationException("You are trying to modify the collection not from Main Thread!");
         }
         else Notify();
 
