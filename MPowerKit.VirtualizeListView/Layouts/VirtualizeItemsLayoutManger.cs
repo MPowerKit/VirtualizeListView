@@ -761,18 +761,11 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             MeasureItem(LaidOutItems, view.Item!, availableSpace);
         }
 
-        var desiredSize = GetDesiredLayoutSize(widthConstraint, heightConstraint);
-
-        return desiredSize;
+        return GetDesiredLayoutSize(widthConstraint, heightConstraint);
     }
 
     public virtual Size ArrangeChildren(Rect bounds)
     {
-        var padding = Padding;
-
-        var availableWidth = bounds.Width - padding.HorizontalThickness;
-        var availableHeight = bounds.Height - padding.VerticalThickness;
-
         var items = CollectionsMarshal.AsSpan((this as IBindableLayout).Children as List<IView>);
         var length = items.Length;
 
@@ -809,7 +802,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             child.Arrange(newBounds);
         }
 
-        return new(availableWidth, availableHeight);
+        return new(bounds.Width, bounds.Height);
     }
     #endregion
 

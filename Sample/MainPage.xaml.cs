@@ -27,6 +27,22 @@ public partial class Item : ObservableObject
     private double _height;
 }
 
+public class ItemTemplateSelector : DataTemplateSelector
+{
+    public DataTemplate EvenTemplate { get; set; }
+    public DataTemplate UnevenTemplate { get; set; }
+
+    protected override DataTemplate OnSelectTemplate(object item, BindableObject container)
+    {
+        if (item is Item data)
+        {
+            return data.Id % 2 == 0 ? EvenTemplate : UnevenTemplate;
+        }
+
+        return null;
+    }
+}
+
 public partial class MainPage
 {
     public MainPage()
