@@ -4,6 +4,8 @@
 
 [![Nuget](https://img.shields.io/nuget/v/MPowerKit.VirtualizeListView)](https://www.nuget.org/packages/MPowerKit.VirtualizeListView)
 
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/alexdobrynin)
+
 It's not a secret to anybody, that ```ListView``` and ```CollectionView``` in MAUI have bad scrolling performance. This project started as an experimantal project POC to find a way to make a virtualize listview using ```ScrollView``` and ```AbsoluteLayout``` only. Suprisingly, the scrolling performance is way better, than was expected. So you can check it right now.
 
 **It works on all platforms MAUI supports and it has the same behavior on all platforms, because it does not have platform-specific code.**
