@@ -714,6 +714,17 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     {
         if (IsOrientation(ScrollOrientation.Both) || LaidOutItems.Count == 0) return new();
 
+#if IOS
+        if (IsOrientation(ScrollOrientation.Vertical))
+        {
+            widthConstraint = Math.Min(widthConstraint, AvailableSpace.Width - ListView.Padding.HorizontalThickness);
+        }
+        else
+        {
+            heightConstraint = Math.Min(heightConstraint, AvailableSpace.Height - ListView.Padding.VerticalThickness);
+        }
+#endif
+
         return IsOrientation(ScrollOrientation.Vertical)
             ? new(widthConstraint, LaidOutItems[^1].RightBottomWithMargin.Y)
             : new(LaidOutItems[^1].RightBottomWithMargin.X, heightConstraint);

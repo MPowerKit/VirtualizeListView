@@ -10,16 +10,13 @@ public class FixedRefreshView : RefreshView
     protected bool PrevEnabled { get; set; }
     protected bool PrevPullRefreshEnabled { get; set; }
 
-    public FixedRefreshView()
+    protected override void OnSizeAllocated(double width, double height)
     {
-#if ANDROID
-        this.SizeChanged += FixedRefreshView_SizeChanged;
-#endif
-    }
+        base.OnSizeAllocated(width, height);
 
-    private void FixedRefreshView_SizeChanged(object? sender, EventArgs e)
-    {
-        Content?.Layout(new Rect(0, 0, Width - Padding.HorizontalThickness, Height - Padding.VerticalThickness));
+#if ANDROID || IOS
+        Content?.Layout(new Rect(0, 0, width - Padding.HorizontalThickness, height - Padding.VerticalThickness));
+#endif
     }
 
     protected virtual void Refresh()

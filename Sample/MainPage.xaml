@@ -24,11 +24,11 @@
                     Text="Move" />
         </Grid>
 
-        <!--<mpowerkit:FixedRefreshView Grid.Row="1"
-                                    Refreshing="FixedRefreshView_Refreshing">-->
+        <mpowerkit:FixedRefreshView Grid.Row="2"
+                                    Refreshing="FixedRefreshView_Refreshing">
         <mpowerkit:VirtualizeListView x:Name="listView"
-                                      Grid.Row="2"
                                       Padding="15"
+                                      Grid.Row="2"
                                       BackgroundColor="Aqua"
                                       IsGrouped="False">
             <mpowerkit:VirtualizeListView.Resources>
@@ -164,7 +164,7 @@
             </mpowerkit:VirtualizeListView.ItemTemplate>-->
         </mpowerkit:VirtualizeListView>
 
-        <!--</mpowerkit:FixedRefreshView>-->
+        </mpowerkit:FixedRefreshView>
 
     </Grid>
 </ContentPage>
