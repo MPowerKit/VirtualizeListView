@@ -670,11 +670,13 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected virtual bool TriggerResizeLayout()
     {
-        Size desiredSize = new();
-        if (IsOrientation(ScrollOrientation.Vertical))
-        {
-            desiredSize = GetDesiredLayoutSize(AvailableSpace.Width, double.PositiveInfinity);
-        }
+        if (IsOrientation(ScrollOrientation.Both)) return false;
+
+        var availableSpace = AvailableSpace;
+
+        var desiredSize = IsOrientation(ScrollOrientation.Vertical)
+            ? GetDesiredLayoutSize(AvailableSpace.Width, double.PositiveInfinity, availableSpace)
+            : GetDesiredLayoutSize(double.PositiveInfinity, AvailableSpace.Height, availableSpace);
 
         if (PrevContentSize == desiredSize) return false;
 
@@ -710,24 +712,13 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             || (ListView.Orientation == ScrollOrientation.Neither && ListView.PrevScrollOrientation == orientation);
     }
 
-    protected virtual Size GetDesiredLayoutSize(double widthConstraint, double heightConstraint)
+    protected virtual Size GetDesiredLayoutSize(double widthConstraint, double heightConstraint, Size availableSpace)
     {
         if (IsOrientation(ScrollOrientation.Both) || LaidOutItems.Count == 0) return new();
 
-#if IOS
-        if (IsOrientation(ScrollOrientation.Vertical))
-        {
-            widthConstraint = Math.Min(widthConstraint, AvailableSpace.Width - ListView.Padding.HorizontalThickness);
-        }
-        else
-        {
-            heightConstraint = Math.Min(heightConstraint, AvailableSpace.Height - ListView.Padding.VerticalThickness);
-        }
-#endif
-
         return IsOrientation(ScrollOrientation.Vertical)
-            ? new(widthConstraint, LaidOutItems[^1].RightBottomWithMargin.Y)
-            : new(LaidOutItems[^1].RightBottomWithMargin.X, heightConstraint);
+            ? new(Math.Min(widthConstraint, availableSpace.Width), LaidOutItems[^1].RightBottomWithMargin.Y)
+            : new(LaidOutItems[^1].RightBottomWithMargin.X, Math.Min(heightConstraint, availableSpace.Height));
     }
 
     protected abstract void RepositionItemsFromIndex(IReadOnlyList<VirtualizeListViewItem> items, int index);
@@ -768,11 +759,11 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             }
             else
 #endif
-            // this triggers item size change when needed
-            MeasureItem(LaidOutItems, view.Item!, availableSpace);
+                // this triggers item size change when needed
+                MeasureItem(LaidOutItems, view.Item!, availableSpace);
         }
 
-        return GetDesiredLayoutSize(widthConstraint, heightConstraint);
+        return GetDesiredLayoutSize(widthConstraint, heightConstraint, availableSpace);
     }
 
     public virtual Size ArrangeChildren(Rect bounds)
