@@ -30,7 +30,7 @@
                                       Padding="15"
                                       Grid.Row="2"
                                       BackgroundColor="Aqua"
-                                      IsGrouped="False">
+                                      IsGrouped="True">
             <mpowerkit:VirtualizeListView.Resources>
                 <ResourceDictionary>
                     <Style TargetType="mpowerkit:LinearItemsLayoutManager">
@@ -47,7 +47,7 @@
                                       VerticalItemSpacing="15" />-->
             </mpowerkit:VirtualizeListView.ItemsLayout>
 
-            <!--<mpowerkit:VirtualizeListView.GroupHeaderTemplate>
+            <mpowerkit:VirtualizeListView.GroupHeaderTemplate>
                 <DataTemplate x:DataType="local:ItemsGroup">
                     <Grid Padding="15"
                           BackgroundColor="Aqua">
@@ -55,7 +55,7 @@
                                TextColor="Black" />
                     </Grid>
                 </DataTemplate>
-            </mpowerkit:VirtualizeListView.GroupHeaderTemplate>-->
+            </mpowerkit:VirtualizeListView.GroupHeaderTemplate>
             <mpowerkit:VirtualizeListView.ItemTemplate>
                 <local:ItemTemplateSelector>
                     <local:ItemTemplateSelector.EvenTemplate>

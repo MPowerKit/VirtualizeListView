@@ -54,6 +54,8 @@ public partial class MainPage
 
     private void FillItems()
     {
+        (listView.ItemsSource as ObservableRangeCollection<ItemsGroup>)?.Clear();
+
         var items = new ObservableRangeCollection<Item>();
 
         for (int i = 0; i < 500; i++)
@@ -68,7 +70,7 @@ public partial class MainPage
             });
         }
 
-        listView.ItemsSource = items;//.GroupBy(i => (int)(i.Id / 10.0)).Select(g => new ItemsGroup(g, g.Key));
+        listView.ItemsSource = new ObservableRangeCollection<ItemsGroup>(items.GroupBy(i => (int)(i.Id / 10.0)).Select(g => new ItemsGroup(g, g.Key)));
     }
 
     private async void FixedRefreshView_Refreshing(object sender, EventArgs e)

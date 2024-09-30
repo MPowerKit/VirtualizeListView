@@ -7,7 +7,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 {
     public class GroupItem(IEnumerable group, object data) : AdapterItem(data)
     {
-        public object Group { get; set; } = group;
+        public IEnumerable Group { get; set; } = group;
     }
     public class GroupHeaderItem(IEnumerable group) : GroupItem(group, group) { }
     public class GroupFooterItem(IEnumerable group) : GroupItem(group, group) { }
@@ -344,6 +344,8 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
             base.OnCollectionChangedReset(itemsSource);
             return;
         }
+
+        ResetGroups(InternalItems.OfType<GroupItem>().DistinctBy(i => i.Group).Select(i => i.Group));
 
         if (itemsSource is not IEnumerable<IEnumerable> groups)
         {
