@@ -11,7 +11,7 @@ public static class BuilderExtensions
 #endif
 
 #if ANDROID || MACIOS
-            handlers.AddHandler<FixedRefreshView, FixedRefreshViewRenderer>();
+            handlers.AddHandler<FixedRefreshView, FixedRefreshViewHandler>();
 #endif
         });
 

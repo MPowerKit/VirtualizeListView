@@ -9,34 +9,34 @@ using WebKit;
 
 namespace MPowerKit.VirtualizeListView;
 
-public class FixedRefreshViewRenderer : ViewHandler<FixedRefreshView, FixedRefreshViewRenderer.RefreshViewWrapper>
+public class FixedRefreshViewHandler : ViewHandler<FixedRefreshView, FixedRefreshViewHandler.RefreshViewWrapper>
 {
-    public static IPropertyMapper<FixedRefreshView, FixedRefreshViewRenderer> RefreshViewRendererMapper = new PropertyMapper<FixedRefreshView, FixedRefreshViewRenderer>(ViewMapper)
+    public static IPropertyMapper<FixedRefreshView, FixedRefreshViewHandler> FixedRefreshViewHandlerMapper = new PropertyMapper<FixedRefreshView, FixedRefreshViewHandler>(ViewMapper)
     {
         [FixedRefreshView.IsRefreshingProperty.PropertyName] = MapIsRefreshing,
         [FixedRefreshView.ContentProperty.PropertyName] = MapContent,
         [FixedRefreshView.RefreshColorProperty.PropertyName] = MapRefreshColor,
-        [FixedRefreshView.BackgroundProperty.PropertyName] = MapBackground,
+        [FixedRefreshView.BackgroundProperty.PropertyName] = (h, v) => { },
         [FixedRefreshView.IsPullToRefreshEnabledProperty.PropertyName] = MapIsPullToRefreshEnabled,
-        [FixedRefreshView.IsEnabledProperty.PropertyName] = (r, v) => { },
+        [FixedRefreshView.IsEnabledProperty.PropertyName] = (h, v) => { },
     };
 
-    public static CommandMapper<FixedRefreshView, FixedRefreshViewRenderer> RefreshViewRendererCommandMapper = new(ViewCommandMapper)
+    public static CommandMapper<FixedRefreshView, FixedRefreshViewHandler> FixedRefreshViewHandlerCommandMapper = new(ViewCommandMapper)
     {
     };
 
-    public FixedRefreshViewRenderer() : base(RefreshViewRendererMapper, RefreshViewRendererCommandMapper)
+    public FixedRefreshViewHandler() : base(FixedRefreshViewHandlerMapper, FixedRefreshViewHandlerCommandMapper)
     {
 
     }
 
-    public FixedRefreshViewRenderer(IPropertyMapper? mapper)
-        : base(mapper ?? RefreshViewRendererMapper, RefreshViewRendererCommandMapper)
+    public FixedRefreshViewHandler(IPropertyMapper? mapper)
+        : base(mapper ?? FixedRefreshViewHandlerMapper, FixedRefreshViewHandlerCommandMapper)
     {
     }
 
-    public FixedRefreshViewRenderer(IPropertyMapper? mapper, CommandMapper? commandMapper)
-        : base(mapper ?? RefreshViewRendererMapper, commandMapper ?? RefreshViewRendererCommandMapper)
+    public FixedRefreshViewHandler(IPropertyMapper? mapper, CommandMapper? commandMapper)
+        : base(mapper ?? FixedRefreshViewHandlerMapper, commandMapper ?? FixedRefreshViewHandlerCommandMapper)
     {
     }
 
@@ -75,32 +75,32 @@ public class FixedRefreshViewRenderer : ViewHandler<FixedRefreshView, FixedRefre
         else PlatformView.IsRefreshing = false;
     }
 
-    public static void MapBackground(FixedRefreshViewRenderer handler, FixedRefreshView view)
+    public static void MapBackground(FixedRefreshViewHandler handler, FixedRefreshView view)
     {
         handler.PlatformView.RefreshControl.UpdateBackground(view);
     }
 
-    public static void MapIsRefreshing(FixedRefreshViewRenderer handler, FixedRefreshView refreshView)
+    public static void MapIsRefreshing(FixedRefreshViewHandler handler, FixedRefreshView refreshView)
     {
         UpdateIsRefreshing(handler);
     }
 
-    public static void MapContent(FixedRefreshViewRenderer handler, FixedRefreshView refreshView)
+    public static void MapContent(FixedRefreshViewHandler handler, FixedRefreshView refreshView)
     {
         UpdateContent(handler);
     }
 
-    public static void MapRefreshColor(FixedRefreshViewRenderer handler, FixedRefreshView refreshView)
+    public static void MapRefreshColor(FixedRefreshViewHandler handler, FixedRefreshView refreshView)
     {
         UpdateRefreshColor(handler);
     }
 
-    public static void MapIsPullToRefreshEnabled(FixedRefreshViewRenderer handler, FixedRefreshView refreshView)
+    public static void MapIsPullToRefreshEnabled(FixedRefreshViewHandler handler, FixedRefreshView refreshView)
     {
         handler.PlatformView?.UpdateIsEnabled(refreshView.IsPullToRefreshEnabled);
     }
 
-    static void UpdateIsRefreshing(FixedRefreshViewRenderer handler)
+    static void UpdateIsRefreshing(FixedRefreshViewHandler handler)
     {
         var virtualView = handler.VirtualView;
         var platformView = handler.PlatformView;
@@ -112,12 +112,12 @@ public class FixedRefreshViewRenderer : ViewHandler<FixedRefreshView, FixedRefre
         platformView.IsRefreshingAnimated = refreshing;
     }
 
-    static void UpdateContent(FixedRefreshViewRenderer handler)
+    static void UpdateContent(FixedRefreshViewHandler handler)
     {
         handler.PlatformView.UpdateContent(handler.VirtualView.Content, handler.MauiContext);
     }
 
-    static void UpdateRefreshColor(FixedRefreshViewRenderer handler)
+    static void UpdateRefreshColor(FixedRefreshViewHandler handler)
     {
         var color = handler.VirtualView?.RefreshColor?.ToPlatform();
 

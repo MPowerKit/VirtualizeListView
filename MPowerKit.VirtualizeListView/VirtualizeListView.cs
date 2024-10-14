@@ -320,6 +320,7 @@ public class VirtualizeListView : ScrollView
             || (Orientation == ScrollOrientation.Neither && PrevScrollOrientation == orientation);
     }
 
+#if MACIOS
     protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
     {
         var size = base.MeasureOverride(widthConstraint, heightConstraint);
@@ -345,6 +346,7 @@ public class VirtualizeListView : ScrollView
 
         return new Size(Math.Min(desiredWidth, widthConstraint), Math.Min(desiredHeight, heightConstraint));
     }
+#endif
 
     #region Adapter
     public DataAdapter Adapter
