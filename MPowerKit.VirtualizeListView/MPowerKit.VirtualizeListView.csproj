@@ -32,6 +32,10 @@
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>
 
+	<PropertyGroup Condition="$(TargetFramework.Contains('windows'))">
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+
 	<ItemGroup Condition="!$(TargetFramework.Contains('android'))">
 		<Compile Remove="**\**\*.Android.cs" />
 		<None Include="**\**\*.Android.cs" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
