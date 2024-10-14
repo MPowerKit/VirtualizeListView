@@ -682,7 +682,14 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         PrevContentSize = desiredSize;
 
-        (this as IView).InvalidateMeasure();
+        View? view =
+#if MACIOS
+            ListView;
+#else
+            this;
+#endif
+
+        (view as IView)?.InvalidateMeasure();
 
         return true;
     }
@@ -708,8 +715,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected virtual bool IsOrientation(ScrollOrientation orientation)
     {
-        return ListView!.Orientation == orientation
-            || (ListView.Orientation == ScrollOrientation.Neither && ListView.PrevScrollOrientation == orientation);
+        return ListView!.IsOrientation(orientation);
     }
 
     protected virtual Size GetDesiredLayoutSize(double widthConstraint, double heightConstraint, Size availableSpace)
@@ -763,7 +769,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
                 MeasureItem(LaidOutItems, view.Item!, availableSpace);
         }
 
-        return GetDesiredLayoutSize(widthConstraint, heightConstraint, availableSpace);
+        var desiredSize = GetDesiredLayoutSize(widthConstraint, heightConstraint, availableSpace);
+        return desiredSize;
     }
 
     public virtual Size ArrangeChildren(Rect bounds)

@@ -314,6 +314,38 @@ public class VirtualizeListView : ScrollView
 #endif
     }
 
+    public virtual bool IsOrientation(ScrollOrientation orientation)
+    {
+        return Orientation == orientation
+            || (Orientation == ScrollOrientation.Neither && PrevScrollOrientation == orientation);
+    }
+
+    protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
+    {
+        var size = base.MeasureOverride(widthConstraint, heightConstraint);
+
+        var orientation = ScrollOrientation.Neither;
+        if (IsOrientation(ScrollOrientation.Both)) orientation = ScrollOrientation.Both;
+        else if (IsOrientation(ScrollOrientation.Vertical)) orientation = ScrollOrientation.Vertical;
+        else if (IsOrientation(ScrollOrientation.Horizontal)) orientation = ScrollOrientation.Horizontal;
+
+        var desiredWidth = size.Width;
+        if (orientation is ScrollOrientation.Both or ScrollOrientation.Horizontal && HorizontalOptions != LayoutOptions.Fill)
+        {
+            desiredWidth = Padding.HorizontalThickness + Margin.HorizontalThickness
+                + (Content?.DesiredSize.Width ?? 0d);
+        }
+
+        var desiredHeight = size.Height;
+        if (orientation is ScrollOrientation.Both or ScrollOrientation.Vertical && VerticalOptions != LayoutOptions.Fill)
+        {
+            desiredHeight = Padding.VerticalThickness + Margin.VerticalThickness
+                + (Content?.DesiredSize.Height ?? 0d);
+        }
+
+        return new Size(Math.Min(desiredWidth, widthConstraint), Math.Min(desiredHeight, heightConstraint));
+    }
+
     #region Adapter
     public DataAdapter Adapter
     {
