@@ -18,7 +18,7 @@ public class FixedRefreshViewHandler : ViewHandler<FixedRefreshView, FixedRefres
         [FixedRefreshView.RefreshColorProperty.PropertyName] = MapRefreshColor,
         [FixedRefreshView.BackgroundProperty.PropertyName] = (h, v) => { },
         [FixedRefreshView.IsPullToRefreshEnabledProperty.PropertyName] = MapIsPullToRefreshEnabled,
-        [FixedRefreshView.IsEnabledProperty.PropertyName] = (h, v) => { },
+        [FixedRefreshView.IsEnabledProperty.PropertyName] = MapIsEnabled,
     };
 
     public static CommandMapper<FixedRefreshView, FixedRefreshViewHandler> FixedRefreshViewHandlerCommandMapper = new(ViewCommandMapper)
@@ -75,10 +75,10 @@ public class FixedRefreshViewHandler : ViewHandler<FixedRefreshView, FixedRefres
         else PlatformView.IsRefreshing = false;
     }
 
-    public static void MapBackground(FixedRefreshViewHandler handler, FixedRefreshView view)
-    {
-        handler.PlatformView.RefreshControl.UpdateBackground(view);
-    }
+    //public static void MapBackground(FixedRefreshViewHandler handler, FixedRefreshView view)
+    //{
+    //    handler.PlatformView.RefreshControl.UpdateBackground(view);
+    //}
 
     public static void MapIsRefreshing(FixedRefreshViewHandler handler, FixedRefreshView refreshView)
     {
@@ -98,6 +98,11 @@ public class FixedRefreshViewHandler : ViewHandler<FixedRefreshView, FixedRefres
     public static void MapIsPullToRefreshEnabled(FixedRefreshViewHandler handler, FixedRefreshView refreshView)
     {
         handler.PlatformView?.UpdateIsEnabled(refreshView.IsPullToRefreshEnabled);
+    }
+
+    public static void MapIsEnabled(FixedRefreshViewHandler handler, FixedRefreshView refreshView)
+    {
+        handler.PlatformView.UserInteractionEnabled = refreshView.IsEnabled;
     }
 
     static void UpdateIsRefreshing(FixedRefreshViewHandler handler)
