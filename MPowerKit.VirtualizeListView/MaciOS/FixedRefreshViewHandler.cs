@@ -17,6 +17,7 @@ public class FixedRefreshViewHandler : ViewHandler<FixedRefreshView, FixedRefres
         [FixedRefreshView.ContentProperty.PropertyName] = MapContent,
         [FixedRefreshView.RefreshColorProperty.PropertyName] = MapRefreshColor,
         [FixedRefreshView.BackgroundProperty.PropertyName] = (h, v) => { },
+        [FixedRefreshView.BackgroundColorProperty.PropertyName] = (h, v) => { },
         [FixedRefreshView.IsPullToRefreshEnabledProperty.PropertyName] = MapIsPullToRefreshEnabled,
         [FixedRefreshView.IsEnabledProperty.PropertyName] = MapIsEnabled,
     };
@@ -74,11 +75,6 @@ public class FixedRefreshViewHandler : ViewHandler<FixedRefreshView, FixedRefres
         }
         else PlatformView.IsRefreshing = false;
     }
-
-    //public static void MapBackground(FixedRefreshViewHandler handler, FixedRefreshView view)
-    //{
-    //    handler.PlatformView.RefreshControl.UpdateBackground(view);
-    //}
 
     public static void MapIsRefreshing(FixedRefreshViewHandler handler, FixedRefreshView refreshView)
     {
