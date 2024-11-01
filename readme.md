@@ -136,6 +136,10 @@ To disable scroll set ```CanScroll``` property to ```false```, and do not change
 
 This package brings to you fixed MAUI's RefreshView as ```FixedRefreshView```. Here, you can disable refreshing without disabling entire collection. For this you may use ```IsPullToRefreshEnabled```.
 
+#### ```BindableLayout```
+
+Since MAUI's ```BindableLayout``` looks like over engineering, this package brings to you another one ```BindableLayout```. It is more lightweight than original one. Can be used with all ```typeof(Layout)```
+
 #### ```ObservableRangeCollection```
 
 Also, this package contains ```ObservableRangeCollection``` which is an ```ObservableCollection```, but it has a bunch of useful methods to manipulate the collection with batch updates. Recommended to use with ```VirtualizeListView```. It provides few methods: ```AddRange```, ```InsertRange```, ```RemoveRange```, ```ReplaceRange```.
