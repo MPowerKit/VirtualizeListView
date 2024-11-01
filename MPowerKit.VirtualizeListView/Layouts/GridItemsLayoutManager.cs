@@ -240,7 +240,7 @@ public class GridItemsLayoutManager : VirtualizeItemsLayoutManger
             {
                 biggestHeight = Math.Max(direction.Max(i => (i.Cell as IView)!.Measure(i.Bounds.Width, double.PositiveInfinity).Height), measure.Height);
 
-                foreach (var di in direction.FindAll(i => i.Bounds.Height < biggestHeight))
+                foreach (var di in direction.Where(i => i.Bounds.Height < biggestHeight))
                 {
                     di.Size = new(di.Size.Width, biggestHeight);
                 }
@@ -259,7 +259,7 @@ public class GridItemsLayoutManager : VirtualizeItemsLayoutManger
             {
                 biggestWidth = Math.Max(direction.Max(i => (i.Cell as IView)!.Measure(double.PositiveInfinity, i.Bounds.Height).Width), measure.Width);
 
-                foreach (var di in direction.FindAll(i => i.Bounds.Width < biggestWidth))
+                foreach (var di in direction.Where(i => i.Bounds.Width < biggestWidth))
                 {
                     di.Size = new(biggestWidth, di.Size.Height);
                 }

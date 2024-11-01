@@ -302,14 +302,15 @@ public class VirtualizeListView : ScrollView
     {
         AdjustScrollRequested?.Invoke(this, (dx, dy));
 
+        var pv = Handler?.PlatformView;
 #if MACIOS
-        var scroll = this.Handler?.PlatformView as UIKit.UIScrollView;
+        var scroll = pv as UIKit.UIScrollView;
         scroll?.SetContentOffset(new(ScrollX + dx, ScrollY + dy), false);
 #elif WINDOWS
-        var scroll = this.Handler?.PlatformView as Microsoft.UI.Xaml.Controls.ScrollViewer;
+        var scroll = pv as Microsoft.UI.Xaml.Controls.ScrollViewer;
         scroll?.ChangeView(ScrollX + dx, ScrollY + dy, null, true);
 #elif ANDROID
-        var scroll = this.Handler?.PlatformView as SmoothScrollView;
+        var scroll = pv as SmoothScrollView;
         scroll?.AdjustScroll(dx, dy);
 #endif
     }

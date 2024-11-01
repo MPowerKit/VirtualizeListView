@@ -30,7 +30,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     protected List<(DataTemplate Template, CellHolder Cell)> CachedCells { get; } = [];
 
     public List<(AdapterItem Data, int Position)> VisibleItems => LaidOutItems
-        .FindAll(i => i.IsOnScreen && i.IsAttached && i.Cell?.Children[0] is VirtualizeListViewCell)
+        .Where(i => i.IsOnScreen && i.IsAttached && i.Cell?.Children[0] is VirtualizeListViewCell)
         .Select(i => (i.AdapterItem, i.Position))
         .ToList();
 
@@ -256,7 +256,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         var finishIndex = startingIndex + e.TotalCount;
 
-        var itemsToRearrange = LaidOutItems.FindAll(i => i.IsOnScreen && i.IsAttached);
+        var itemsToRearrange = LaidOutItems.Where(i => i.IsOnScreen && i.IsAttached);
         var firstVisibleItem = itemsToRearrange.FirstOrDefault();
         var prevVisibleCellBounds = firstVisibleItem?.Bounds ?? new();
 
@@ -311,7 +311,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         RepositionItemsFromIndex(LaidOutItems, startingIndex);
 
-        var itemsToRearrange = LaidOutItems.FindAll(i => i.IsOnScreen && i.IsAttached);
+        var itemsToRearrange = LaidOutItems.Where(i => i.IsOnScreen && i.IsAttached);
         var firstVisibleItem = itemsToRearrange.FirstOrDefault();
         var prevVisibleCellBounds = firstVisibleItem?.Bounds ?? new();
 
@@ -387,7 +387,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             DetachCell(itemToRemove);
         }
 
-        var itemsToRearrange = LaidOutItems.FindAll(i => i.IsOnScreen && i.IsAttached);
+        var itemsToRearrange = LaidOutItems.Where(i => i.IsOnScreen && i.IsAttached);
         var firstVisibleItem = itemsToRearrange.FirstOrDefault();
         var prevVisibleCellBounds = firstVisibleItem?.Bounds ?? new();
 
@@ -601,7 +601,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             return;
         }
 
-        var freeCell = CachedCells.Find(i => (i.Template as IDataTemplateController).Id == (item.Template as IDataTemplateController).Id);
+        var freeCell = CachedCells.LastOrDefault(i => (i.Template as IDataTemplateController).Id == (item.Template as IDataTemplateController).Id);
         if (freeCell != default)
         {
             CachedCells.Remove(freeCell);
@@ -616,7 +616,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         }
         else
         {
-            var freeItem = LaidOutItems.Find(i =>
+            var freeItem = LaidOutItems.FirstOrDefault(i =>
                 (i.Template as IDataTemplateController).Id == (item.Template as IDataTemplateController).Id
                 && !i.IsAttached && !i.IsOnScreen && i.Cell is not null);
             if (freeItem is not null)
@@ -642,7 +642,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 #if !ANDROID
         // on Android we must arrange item in real bounds, not using translation
         // issue #5
-        foreach (var item in LaidOutItems.FindAll(i => i.Cell is not null))
+        foreach (var item in LaidOutItems.Where(i => i.Cell is not null))
         {
             DrawItem(LaidOutItems, item);
         }
@@ -765,8 +765,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             }
             else
 #endif
-                // this triggers item size change when needed
-                MeasureItem(LaidOutItems, view.Item!, availableSpace);
+            // this triggers item size change when needed
+            MeasureItem(LaidOutItems, view.Item!, availableSpace);
         }
 
         var desiredSize = GetDesiredLayoutSize(widthConstraint, heightConstraint, availableSpace);

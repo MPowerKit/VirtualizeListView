@@ -455,7 +455,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
         var totalCount = InternalItems.Count;
 
-        var prevGroupItems = InternalItems.FindAll(i => i is GroupItem groupItem and not GroupHeaderItem and not GroupFooterItem
+        var prevGroupItems = InternalItems.Where(i => i is GroupItem groupItem and not GroupHeaderItem and not GroupFooterItem
                                                         && groupItem.Group == group)
                                           .Select(i => i.Data)
                                           .ToList();
