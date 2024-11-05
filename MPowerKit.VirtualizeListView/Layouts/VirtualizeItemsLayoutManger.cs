@@ -270,7 +270,12 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         RepositionItemsFromIndex(LaidOutItems, finishIndex);
 
         ShiftItemsConsecutively(LaidOutItems, startingIndex, finishIndex);
-        ShiftItemsChunk(LaidOutItems, finishIndex, LaidOutItems.Count);
+
+        if (startingIndex == 0)
+        {
+            ShiftItemsConsecutively(LaidOutItems, finishIndex, LaidOutItems.Count);
+        }
+        else ShiftItemsChunk(LaidOutItems, finishIndex, LaidOutItems.Count);
 
         UpdateItemsLayout(startingIndex, false);
 
@@ -309,26 +314,23 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             return;
         }
 
-        RepositionItemsFromIndex(LaidOutItems, startingIndex);
-
         var itemsToRearrange = LaidOutItems.Where(i => i.IsOnScreen && i.IsAttached);
         var firstVisibleItem = itemsToRearrange.FirstOrDefault();
         var prevVisibleCellBounds = firstVisibleItem?.Bounds ?? new();
 
-        ShiftItemsChunk(LaidOutItems, startingIndex, LaidOutItems.Count);
+        RepositionItemsFromIndex(LaidOutItems, startingIndex);
 
-        // if we removed items from the beginning
         if (startingIndex == 0)
         {
-            // if we are at the top we dont need to adjust the scroll position
-            if (ListView!.ScrollX == 0d && ListView.ScrollY == 0d)
-            {
-                UpdateItemsLayout(startingIndex, false);
-                return;
-            }
+            ShiftItemsConsecutively(LaidOutItems, startingIndex, LaidOutItems.Count);
+        }
+        else ShiftItemsChunk(LaidOutItems, startingIndex, LaidOutItems.Count);
 
-            // otherwise we need to adjust the scroll position
-            ListView.ScrollToAsync(0d, 0d, false);
+        // if we removed items from the beginning
+        // and if we are at the top we dont need to adjust the scroll position
+        if (startingIndex == 0 && ListView!.ScrollX == 0d && ListView.ScrollY == 0d)
+        {
+            UpdateItemsLayout(startingIndex, false);
             return;
         }
 
@@ -364,20 +366,20 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         if (!DoesListViewHaveSize()) return;
 
         var count = LaidOutItems.Count;
-        var start = e.StartingIndex;
+        var startingIndex = e.StartingIndex;
         var oldCount = e.OldCount;
         var newCount = e.NewCount;
-        var oldEnd = start + e.OldCount;
-        var newEnd = start + e.NewCount;
+        var oldEnd = startingIndex + e.OldCount;
+        var newEnd = startingIndex + e.NewCount;
         var adapterItemsCount = Adapter!.ItemsCount;
 
-        if (count == 0 || adapterItemsCount == 0 || start < 0 || oldEnd > count || newEnd > adapterItemsCount)
+        if (count == 0 || adapterItemsCount == 0 || startingIndex < 0 || oldEnd > count || newEnd > adapterItemsCount)
         {
             throw new ArgumentException("Invalid range");
         }
 
-        var itemsToRemove = CollectionsMarshal.AsSpan(LaidOutItems[start..oldEnd]);
-        LaidOutItems.RemoveRange(start, oldCount);
+        var itemsToRemove = CollectionsMarshal.AsSpan(LaidOutItems[startingIndex..oldEnd]);
+        LaidOutItems.RemoveRange(startingIndex, oldCount);
 
         for (int i = 0; i < oldCount; i++)
         {
@@ -391,7 +393,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         var firstVisibleItem = itemsToRearrange.FirstOrDefault();
         var prevVisibleCellBounds = firstVisibleItem?.Bounds ?? new();
 
-        for (int index = start; index < newEnd; index++)
+        for (int index = startingIndex; index < newEnd; index++)
         {
             var item = CreateItemForPosition(index);
 
@@ -400,44 +402,29 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         RepositionItemsFromIndex(LaidOutItems, newEnd);
 
-        ShiftItemsConsecutively(LaidOutItems, start, newEnd);
+        ShiftItemsConsecutively(LaidOutItems, startingIndex, newEnd);
         ShiftItemsChunk(LaidOutItems, newEnd, LaidOutItems.Count);
 
         // if we replaced items from the beginning
-        if (start == 0)
+        // and if we are at the top we dont need to adjust the scroll position
+        if (startingIndex == 0 && ListView!.ScrollX == 0d && ListView.ScrollY == 0d)
         {
-            // if we are at the top we dont need to adjust the scroll position
-            if (ListView!.ScrollX == 0d && ListView.ScrollY == 0d)
-            {
-                UpdateItemsLayout(start, false);
-                return;
-            }
-
-            // if we replaced items before the first visible item
-            // then we also need to adjust the scroll position
-            if (firstVisibleItem is not null && firstVisibleItem.Position >= start)
-            {
-                AdjustScrollIfNeeded(LaidOutItems, firstVisibleItem, prevVisibleCellBounds);
-                return;
-            }
-
-            // otherwise we need to adjust the scroll position
-            ListView.ScrollToAsync(0d, 0d, false);
+            UpdateItemsLayout(startingIndex, false);
             return;
         }
 
         // if there is no any visible item 
         // or we replaced items after the first visible item
         // so we dont need to adjust the scroll position
-        if (firstVisibleItem is null || firstVisibleItem.Position < start)
+        if (firstVisibleItem is null || firstVisibleItem.Position < startingIndex)
         {
-            UpdateItemsLayout(start, false);
+            UpdateItemsLayout(startingIndex, false);
             return;
         }
 
         // if we replaced items before the first visible item
         // then we also need to adjust the scroll position
-        if (firstVisibleItem.Position >= start)
+        if (firstVisibleItem.Position >= startingIndex)
         {
             AdjustScrollIfNeeded(LaidOutItems, firstVisibleItem, prevVisibleCellBounds);
         }
