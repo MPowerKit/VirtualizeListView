@@ -496,8 +496,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             ShiftItemsChunk(LaidOutItems, itemsToRearrange[^1].Position + 1, count);
         }
 
-        if (firstVisibleItem is not null && AdjustScrollIfNeeded(LaidOutItems, firstVisibleItem, prevVisibleCellBounds)
-            && (ListView!.ScrollX != 0d || ListView.ScrollY != 0d)) return;
+        //if (firstVisibleItem is not null && AdjustScrollIfNeeded(LaidOutItems, firstVisibleItem, prevVisibleCellBounds)
+        //    && (ListView!.ScrollX != 0d || ListView.ScrollY != 0d)) return;
 
         UpdateItemsLayout(start, false);
     }
