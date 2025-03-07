@@ -45,7 +45,7 @@ public class GridItemsLayoutManager : VirtualizeItemsLayoutManger
             typeof(LinearItemsLayoutManager));
     #endregion
 
-    protected override VirtualizeListViewItem CreateItemForPosition(int position)
+    public override VirtualizeListViewItem CreateItemForPosition(int position)
     {
         var item = new VirtualizeListViewItem(this)
         {

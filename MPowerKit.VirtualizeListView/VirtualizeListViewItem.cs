@@ -4,7 +4,7 @@ namespace MPowerKit.VirtualizeListView;
 
 public class VirtualizeListViewItem
 {
-    private CellHolder _cell;
+    private CellHolder? _cell;
 
     protected VirtualizeItemsLayoutManger LayoutManager { get; set; }
 
@@ -39,11 +39,32 @@ public class VirtualizeListViewItem
 
     public Size Size { get; set; }
     public Point LeftTopWithMargin { get; set; }
-    public Rect Bounds => new(Margin.Left + LeftTopWithMargin.X, Margin.Top + LeftTopWithMargin.Y, Size.Width, Size.Height);
-    public Point LeftTop => new(Bounds.Left, Bounds.Top);
-    public Point RightBottom => new(Bounds.Right, Bounds.Bottom);
-    public Point RightBottomWithMargin => new(RightBottom.X + Margin.Right, RightBottom.Y + Margin.Bottom);
     public Thickness Margin { get; set; }
+    public Point LeftTop => new(LeftTopWithMargin.X + Margin.Left, LeftTopWithMargin.Y + Margin.Top);
+    public Rect Bounds
+    {
+        get
+        {
+            var leftTop = LeftTop;
+            return new(leftTop.X, leftTop.Y, Size.Width, Size.Height);
+        }
+    }
+    public Point RightBottom
+    {
+        get
+        {
+            var bounds = Bounds;
+            return new(bounds.Right, bounds.Bottom);
+        }
+    }
+    public Point RightBottomWithMargin
+    {
+        get
+        {
+            var rightBottom = RightBottom;
+            return new(rightBottom.X + Margin.Right, rightBottom.Y + Margin.Bottom);
+        }
+    }
 
     public int Span { get; set; }
     public int Row { get; set; } = -1;
@@ -61,12 +82,12 @@ public class VirtualizeListViewItem
         var listview = LayoutManager.ListView!;
 
         Rect itemBoundsWithCollectionPadding = new(
-            Bounds.X + listview.Padding.Left,
-            Bounds.Y + listview.Padding.Top,
+            Bounds.X,
+            Bounds.Y,
             Bounds.Width,
             Bounds.Height);
 
-        Rect visibleRect = new(listview.ScrollX, listview.ScrollY, listview.Width, listview.Height);
+        Rect visibleRect = new(listview.ScrollX - listview.Padding.Left, listview.ScrollY - listview.Padding.Top, listview.Width, listview.Height);
 
         return itemBoundsWithCollectionPadding.IntersectsWith(visibleRect);
     }

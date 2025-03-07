@@ -1,17 +1,18 @@
 ﻿using System.Collections;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
 namespace MPowerKit.VirtualizeListView;
 
-public class VirtualizeListView : ScrollView
+public partial class VirtualizeListView : ScrollView
 {
-    public event EventHandler<(double dx, double dy)> AdjustScrollRequested;
-    public event EventHandler Refreshing;
-    public event EventHandler<object> ItemAppearing;
-    public event EventHandler<object> ItemDisappearing;
-    public event EventHandler<object> ItemTapped;
+    public event EventHandler<(double dx, double dy)>? AdjustScrollRequested;
+    public event EventHandler? Refreshing;
+    public event EventHandler<object>? ItemAppearing;
+    public event EventHandler<object>? ItemDisappearing;
+    public event EventHandler<object>? ItemTapped;
 
     protected object? PrevAppearedItem { get; set; }
 
@@ -22,10 +23,6 @@ public class VirtualizeListView : ScrollView
         this.Scrolled += VirtualizeListView_Scrolled;
 
         PrevScrollOrientation = Orientation != ScrollOrientation.Neither ? Orientation : ScrollOrientation.Vertical;
-
-        Adapter = new GroupableDataAdapter(this);
-
-        OnItemsLayoutChanged();
     }
 
     protected override void OnHandlerChanged()
@@ -43,6 +40,10 @@ public class VirtualizeListView : ScrollView
         {
             OnAdapterChanging();
         }
+        else if (propertyName == StickyHeadersProperty.PropertyName)
+        {
+            OnStickyHeadersChanging();
+        }
     }
 
     protected override void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -51,7 +52,7 @@ public class VirtualizeListView : ScrollView
 
         if (propertyName == ItemsLayoutProperty.PropertyName)
         {
-            OnItemsLayoutChanged();
+            LayoutManager = GetLayoutManger()!;
         }
         else if (propertyName == LayoutManagerProperty.PropertyName)
         {
@@ -104,6 +105,25 @@ public class VirtualizeListView : ScrollView
         {
             OnSizeChanged();
         }
+        else if (propertyName == StickyHeadersProperty.PropertyName)
+        {
+            OnStickyHeadersChanged();
+        }
+    }
+
+    protected virtual void OnStickyHeadersChanging()
+    {
+        if (!StickyHeaders) return;
+
+        var stickyHeaders = ItemDecorators.OfType<StickyHeaderItemDecorator>().FirstOrDefault();
+        ItemDecorators.Remove(stickyHeaders);
+    }
+
+    protected virtual void OnStickyHeadersChanged()
+    {
+        if (!StickyHeaders || ItemDecorators.Any(d => d is StickyHeaderItemDecorator)) return;
+
+        ItemDecorators.Add(new StickyHeaderItemDecorator());
     }
 
     protected virtual void OnHeaderChanged()
@@ -118,7 +138,7 @@ public class VirtualizeListView : ScrollView
 
     protected virtual void VirtualizeListView_Scrolled(object? sender, ScrolledEventArgs e)
     {
-        LayoutManager?.SendListViewScrolledScrolled(e);
+        LayoutManager?.SendListViewScrolled(e);
     }
 
     protected virtual void ReloadData()
@@ -196,11 +216,11 @@ public class VirtualizeListView : ScrollView
         this.Content = LayoutManager;
     }
 
-    protected virtual void OnItemsLayoutChanged()
+    protected virtual VirtualizeItemsLayoutManger? GetLayoutManger()
     {
         if (ItemsLayout is LinearLayout linearLayout)
         {
-            LayoutManager = new LinearItemsLayoutManager()
+            return new LinearItemsLayoutManager()
             {
                 ItemSpacing = linearLayout.ItemSpacing,
                 CachePoolSize = linearLayout.InitialCachePoolSize,
@@ -209,7 +229,7 @@ public class VirtualizeListView : ScrollView
         }
         else if (ItemsLayout is GridLayout gridLayout)
         {
-            LayoutManager = new GridItemsLayoutManager()
+            return new GridItemsLayoutManager()
             {
                 VerticalItemSpacing = gridLayout.VerticalItemSpacing,
                 HorizontalItemsSpacing = gridLayout.HorizontalItemSpacing,
@@ -218,6 +238,8 @@ public class VirtualizeListView : ScrollView
                 BindingContext = null
             };
         }
+
+        return null;
     }
 
     protected override void OnSizeAllocated(double width, double height)
@@ -288,7 +310,7 @@ public class VirtualizeListView : ScrollView
     {
         var adapter = Adapter;
 
-        var visibleItems = LayoutManager.VisibleItems;
+        var visibleItems = LayoutManager.VisibleDataItems;
 
         foreach (var (data, position) in visibleItems)
         {
@@ -349,6 +371,44 @@ public class VirtualizeListView : ScrollView
     }
 #endif
 
+    #region StickyHeaders
+    public bool StickyHeaders
+    {
+        get { return (bool)GetValue(StickyHeadersProperty); }
+        set { SetValue(StickyHeadersProperty, value); }
+    }
+
+    public static readonly BindableProperty StickyHeadersProperty =
+        BindableProperty.Create(
+            nameof(StickyHeaders),
+            typeof(bool),
+            typeof(VirtualizeListView));
+    #endregion
+
+    #region ItemDecorators
+    public ObservableCollection<ItemDecorator> ItemDecorators
+    {
+        get { return (ObservableCollection<ItemDecorator>)GetValue(ItemDecoratorsProperty); }
+    }
+
+    public static readonly BindableProperty ItemDecoratorsProperty =
+        BindableProperty.Create(
+            nameof(ItemDecorators),
+            typeof(ObservableCollection<ItemDecorator>),
+            typeof(VirtualizeListView),
+            default(ObservableCollection<ItemDecorator>),
+            defaultValueCreator: bindable =>
+            {
+                var listview = (bindable as VirtualizeListView)!;
+                var decorators = new ObservableCollection<ItemDecorator>();
+                if (listview.StickyHeaders)
+                {
+                    decorators.Add(new StickyHeaderItemDecorator());
+                }
+                return decorators;
+            });
+    #endregion
+
     #region Adapter
     public DataAdapter Adapter
     {
@@ -360,7 +420,12 @@ public class VirtualizeListView : ScrollView
         BindableProperty.Create(
             nameof(Adapter),
             typeof(DataAdapter),
-            typeof(VirtualizeListView));
+            typeof(VirtualizeListView),
+            default(DataAdapter),
+            defaultValueCreator: bindable =>
+            {
+                return new GroupableDataAdapter((bindable as VirtualizeListView)!);
+            });
     #endregion
 
     #region ItemsLayout
@@ -389,7 +454,12 @@ public class VirtualizeListView : ScrollView
         BindableProperty.Create(
             nameof(LayoutManager),
             typeof(VirtualizeItemsLayoutManger),
-            typeof(VirtualizeListView));
+            typeof(VirtualizeListView),
+            default(VirtualizeItemsLayoutManger),
+            defaultValueCreator: bindable =>
+            {
+                return (bindable as VirtualizeListView)!.GetLayoutManger();
+            });
     #endregion
 
     #region CanScroll

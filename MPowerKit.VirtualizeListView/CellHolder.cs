@@ -8,6 +8,21 @@ public class CellHolder : Grid
     public bool WasMeasured { get; protected set; }
     public bool Attached { get; set; }
 
+    public View? Content
+    {
+        get => this.ElementAtOrDefault(0) as View;
+        set
+        {
+            if (value == Content) return;
+
+            this.Clear();
+
+            if (value is null) return;
+
+            this.Add(value);
+        }
+    }
+
     protected override Size ArrangeOverride(Rect bounds)
     {
         WasArranged = true;

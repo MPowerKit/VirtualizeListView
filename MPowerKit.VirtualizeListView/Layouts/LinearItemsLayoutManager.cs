@@ -35,7 +35,7 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
             : new(ItemSpacing, 0d, 0d, 0d);
     }
 
-    protected override VirtualizeListViewItem CreateItemForPosition(int position)
+    public override VirtualizeListViewItem CreateItemForPosition(int position)
     {
         var item = new VirtualizeListViewItem(this)
         {

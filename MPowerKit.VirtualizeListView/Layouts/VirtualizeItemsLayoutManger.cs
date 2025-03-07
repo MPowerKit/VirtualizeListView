@@ -25,21 +25,20 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected List<VirtualizeListViewItem> LaidOutItems { get; } = [];
 
-    public IReadOnlyList<VirtualizeListViewItem> ReadOnlyLaidOutItems => LaidOutItems;
+    public IReadOnlyList<VirtualizeListViewItem> ReadOnlyLaidOutItems => LaidOutItems.AsReadOnly();
 
     protected List<(DataTemplate Template, CellHolder Cell)> CachedCells { get; } = [];
 
-    public List<(AdapterItem Data, int Position)> VisibleItems => LaidOutItems
+    public List<VirtualizeListViewItem> VisibleItems => [.. LaidOutItems
+        .Where(i => i.IsOnScreen && i.IsAttached)];
+
+    public List<(AdapterItem Data, int Position)> VisibleDataItems => [.. LaidOutItems
         .Where(i => i.IsOnScreen && i.IsAttached && i.Cell?.Children[0] is VirtualizeListViewCell)
-        .Select(i => (i.AdapterItem, i.Position))
-        .ToList();
+        .Select(i => (i.AdapterItem, i.Position))];
 
     protected virtual Size AvailableSpace => GetAvailableSpace();
 
-    protected override ILayoutManager CreateLayoutManager()
-    {
-        return this;
-    }
+    protected override ILayoutManager CreateLayoutManager() => this;
 
     protected override void OnParentChanging(ParentChangingEventArgs args)
     {
@@ -86,6 +85,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         adapter.ItemRangeRemoved += AdapterItemRangeRemoved;
 
         InvalidateLayout();
+
+        AttachDecorators();
     }
 
     public virtual void SendListViewAdapterReset()
@@ -93,6 +94,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         var adapter = ListView?.Adapter;
 
         if (adapter is null) return;
+
+        DetachDecorators();
 
         adapter.DataSetChanged -= AdapterDataSetChanged;
         adapter.ItemMoved -= AdapterItemMoved;
@@ -103,13 +106,39 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         Adapter = null;
     }
 
-    public virtual void SendListViewScrolledScrolled(ScrolledEventArgs e)
+    protected virtual void AttachDecorators()
+    {
+        foreach (var item in ListView!.ItemDecorators)
+        {
+            item.OnAttached(ListView!, this, Adapter!);
+        }
+    }
+
+    protected virtual void DetachDecorators()
+    {
+        foreach (var item in ListView!.ItemDecorators)
+        {
+            item.OnDetached(ListView!, this, Adapter!);
+        }
+    }
+
+    protected virtual void OnDrawOver()
+    {
+        foreach (var item in ListView!.ItemDecorators)
+        {
+            item.OnDrawOver();
+        }
+    }
+
+    public virtual void SendListViewScrolled(ScrolledEventArgs e)
     {
         if (ListView is null) return;
 
         var newScroll = e - PrevScroll;
         UpdateItemsLayout(0, true);
         PrevScroll = newScroll;
+
+        OnDrawOver();
     }
 
     public virtual void SendListViewContentSizeChanged()
@@ -122,14 +151,21 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         PrevAvailableSpace = newSpace;
 
-        if (LaidOutItems.Count == 0)
+        try
         {
-            InvalidateLayout();
-            return;
+            if (LaidOutItems.Count == 0)
+            {
+                InvalidateLayout();
+                return;
+            }
+            else
+            {
+                RelayoutItems();
+            }
         }
-        else
+        finally
         {
-            RelayoutItems();
+            OnDrawOver();
         }
     }
 
@@ -558,6 +594,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 #endif
     }
 
+
+
     protected virtual void DetachCell(VirtualizeListViewItem item)
     {
         if (!item.IsAttached || item.Cell is null) return;
@@ -681,9 +719,33 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         return true;
     }
 
-    protected virtual Size GetAvailableSpace()
+    public virtual Size GetAvailableSpace()
     {
-        return new Size(ListView!.Width - ListView.Padding.HorizontalThickness, ListView.Height - ListView.Padding.VerticalThickness);
+        return new(ListView!.Width - ListView.Padding.HorizontalThickness, ListView.Height - ListView.Padding.VerticalThickness);
+    }
+
+    public virtual Size MeasureItem(VirtualizeListViewItem item, Size availableSpace)
+    {
+        if (IsOrientation(ScrollOrientation.Both)) return new();
+
+        var iview = (item.Cell as IView)!;
+
+        Size measure;
+
+        if (IsOrientation(ScrollOrientation.Vertical))
+        {
+            measure = iview.Measure(GetEstimatedItemSize(item, availableSpace).Width, double.PositiveInfinity);
+
+            item.Size = new(availableSpace.Width, measure.Height);
+        }
+        else
+        {
+            measure = iview.Measure(double.PositiveInfinity, GetEstimatedItemSize(item, availableSpace).Height);
+
+            item.Size = new(measure.Width, availableSpace.Height);
+        }
+
+        return measure;
     }
 
     protected virtual VirtualizeListViewItem CreateDummyItem(DataTemplate template, CellHolder cell)
@@ -715,7 +777,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     }
 
     protected abstract void RepositionItemsFromIndex(IReadOnlyList<VirtualizeListViewItem> items, int index);
-    protected abstract VirtualizeListViewItem CreateItemForPosition(int position);
+    public abstract VirtualizeListViewItem CreateItemForPosition(int position);
     protected abstract Thickness GetItemMargin(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item);
     protected abstract Size GetEstimatedItemSize(VirtualizeListViewItem item, Size availableSize);
     protected abstract Size MeasureItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace);
@@ -736,7 +798,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         for (int n = 0; n < length; n++)
         {
             var child = items[n];
-            var view = (child as CellHolder)!;
+            if (child is not CellHolder view) continue;
 
             if ((view.IsCached || !view.Item!.IsAttached)
 #if MACIOS
@@ -768,7 +830,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         for (int n = 0; n < length; n++)
         {
             var child = items[n];
-            var view = (child as CellHolder)!;
+
+            if (child is not CellHolder view) continue;
 
             if ((view.IsCached || !view.Item!.IsAttached)
 #if MACIOS
@@ -794,7 +857,6 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             // on other platforms we need to arrange items anyway
             if (view.Bounds == newBounds) continue;
 #endif
-
             child.Arrange(newBounds);
         }
 

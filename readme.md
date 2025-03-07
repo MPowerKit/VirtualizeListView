@@ -35,8 +35,8 @@ So, under the hood it is a ```ScrollView``` with custom ```typeof(Layout)``` as 
 - [x] Item tap handling
 - [x] Item resize handling
 - [x] Add, Remove, Replace, Move, Reset operations on collection
+- [x] Sticky headers (Windows not supported)
 - [ ] Drag and drop (reordering)
-- [ ] Sticky headers
 - [ ] Animated add/remove/move operations
 
 # Tips for better scrolling user experience

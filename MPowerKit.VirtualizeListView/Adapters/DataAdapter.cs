@@ -188,7 +188,7 @@ public class DataAdapter : IDisposable
         var content = template.CreateContent() as View;
         var holder = new CellHolder()
         {
-            /*Content =*/ content
+            Content = content
         };
         return holder;
     }
