@@ -198,14 +198,20 @@ public class DataAdapter : IDisposable
         var holder = CreateEmptyCellForTemplate(template);
         var content = holder[0];
 
-        if (HasHeader && position == 0 && content is VirtualizeListViewCell)
+        if (HasHeader && position == 0)
         {
-            throw new ArgumentException("HeaderTemplate can't be typeof(VirtualizeListViewCell)");
+            if (content is VirtualizeListViewCell)
+                throw new ArgumentException("HeaderTemplate can't be typeof(VirtualizeListViewCell)");
+            else
+                return holder;
         }
 
-        if (HasFooter && position == ItemsCount - 1 && content is VirtualizeListViewCell)
+        if (HasFooter && position == ItemsCount - 1)
         {
-            throw new ArgumentException("FooterTemplate can't be typeof(VirtualizeListViewCell)");
+            if (content is VirtualizeListViewCell)
+                throw new ArgumentException("FooterTemplate can't be typeof(VirtualizeListViewCell)");
+            else
+                return holder;
         }
 
         if (content is not VirtualizeListViewCell)

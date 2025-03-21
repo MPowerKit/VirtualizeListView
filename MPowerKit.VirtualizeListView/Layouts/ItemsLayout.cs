@@ -7,7 +7,7 @@ public interface IItemsLayout
 
 public class ItemsLayout : IItemsLayout
 {
-    public int InitialCachePoolSize { get; set; } = 4;
+    public int InitialCachePoolSize { get; set; } = 2;
 }
 
 public class LinearLayout : ItemsLayout

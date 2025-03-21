@@ -23,6 +23,8 @@ public partial class VirtualizeListView : ScrollView
         this.Scrolled += VirtualizeListView_Scrolled;
 
         PrevScrollOrientation = Orientation != ScrollOrientation.Neither ? Orientation : ScrollOrientation.Vertical;
+
+        OnLayoutManagerChanged();
     }
 
     protected override void OnHandlerChanged()
@@ -396,7 +398,6 @@ public partial class VirtualizeListView : ScrollView
             nameof(ItemDecorators),
             typeof(ObservableCollection<ItemDecorator>),
             typeof(VirtualizeListView),
-            default(ObservableCollection<ItemDecorator>),
             defaultValueCreator: bindable =>
             {
                 var listview = (bindable as VirtualizeListView)!;
@@ -421,7 +422,6 @@ public partial class VirtualizeListView : ScrollView
             nameof(Adapter),
             typeof(DataAdapter),
             typeof(VirtualizeListView),
-            default(DataAdapter),
             defaultValueCreator: bindable =>
             {
                 return new GroupableDataAdapter((bindable as VirtualizeListView)!);
@@ -455,7 +455,6 @@ public partial class VirtualizeListView : ScrollView
             nameof(LayoutManager),
             typeof(VirtualizeItemsLayoutManger),
             typeof(VirtualizeListView),
-            default(VirtualizeItemsLayoutManger),
             defaultValueCreator: bindable =>
             {
                 return (bindable as VirtualizeListView)!.GetLayoutManger();
