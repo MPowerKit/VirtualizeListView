@@ -35,7 +35,7 @@ So, under the hood it is a ```ScrollView``` with custom ```typeof(Layout)``` as 
 - [x] Item tap handling
 - [x] Item resize handling
 - [x] Add, Remove, Replace, Move, Reset operations on collection
-- [x] Sticky headers (Windows not supported)
+- [x] Sticky headers (Android only, WIP)
 - [ ] Drag and drop (reordering)
 - [ ] Animated add/remove/move operations
 
@@ -73,10 +73,10 @@ To change items spacing you need to reset the ```ItemsLayout``` property. If you
 
 ```xaml
 <mpowerkit:VirtualizeListView>
-	<mpowerkit:VirtualizeListView.ItemsLayout>
-		<mpowerkit:LinearLayout ItemSpacing="15" 
-		                        InitialCachePoolSize="4" /> <!-- InitialCachePoolSize is optional, default value is 4 -->
-	</mpowerkit:VirtualizeListView.ItemsLayout>
+    <mpowerkit:VirtualizeListView.ItemsLayout>
+        <mpowerkit:LinearLayout ItemSpacing="15" 
+                                InitialCachePoolSize="4" /> <!-- InitialCachePoolSize is optional, default value is 4 -->
+    </mpowerkit:VirtualizeListView.ItemsLayout>
 </mpowerkit:VirtualizeListView>
 ```
 
@@ -84,11 +84,11 @@ or if you want to use ```GridLayout```:
 
 ```xaml
 <mpowerkit:VirtualizeListView>
-	<mpowerkit:VirtualizeListView.ItemsLayout>
-		<mpowerkit:GridLayout HorizontalItemSpacing="15"
+    <mpowerkit:VirtualizeListView.ItemsLayout>
+        <mpowerkit:GridLayout HorizontalItemSpacing="15"
                               Span="3"
                               VerticalItemSpacing="15" />
-	</mpowerkit:VirtualizeListView.ItemsLayout>
+    </mpowerkit:VirtualizeListView.ItemsLayout>
 </mpowerkit:VirtualizeListView>
 ```
 
