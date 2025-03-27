@@ -75,7 +75,7 @@ To change items spacing you need to reset the ```ItemsLayout``` property. If you
 <mpowerkit:VirtualizeListView>
     <mpowerkit:VirtualizeListView.ItemsLayout>
         <mpowerkit:LinearLayout ItemSpacing="15" 
-                                InitialCachePoolSize="4" /> <!-- InitialCachePoolSize is optional, default value is 4 -->
+                                InitialCachePoolSize="2" /> <!-- InitialCachePoolSize is optional, default value is 2 -->
     </mpowerkit:VirtualizeListView.ItemsLayout>
 </mpowerkit:VirtualizeListView>
 ```

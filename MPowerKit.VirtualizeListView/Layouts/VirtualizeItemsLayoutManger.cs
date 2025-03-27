@@ -210,7 +210,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     {
         if (Adapter is null || poolSize <= 0) return;
 
-        var pool = Adapter.CreateCellsPool(4);
+        var pool = Adapter.CreateCellsPool(poolSize);
 
         for (int i = 0; i < pool.Count; i++)
         {
