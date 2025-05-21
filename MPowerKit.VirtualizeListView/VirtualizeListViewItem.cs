@@ -16,8 +16,8 @@ public class VirtualizeListViewItem
     public int Position { get; set; } = -1;
     public virtual bool IsOnScreen => IntersectsWithScrollVisibleRect();
     public bool IsAttached => Cell?.Attached ?? false;
-    public DataTemplate Template { get; set; }
-    public AdapterItem AdapterItem { get; set; }
+    public DataTemplate? Template { get; set; }
+    public AdapterItem? AdapterItem { get; set; }
     public CellHolder? Cell
     {
         get => _cell;

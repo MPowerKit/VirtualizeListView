@@ -594,13 +594,11 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 #endif
     }
 
-
-
     protected virtual void DetachCell(VirtualizeListViewItem item)
     {
         if (!item.IsAttached || item.Cell is null) return;
 
-        Adapter!.OnCellRecycled(item.Cell!, item.AdapterItem, item.Position);
+        Adapter!.OnCellRecycled(item.Cell!, item.AdapterItem!, item.Position);
 
         CacheCell(item);
     }
@@ -614,7 +612,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         cell.TranslationX = CachedItemsCoords;
         cell.TranslationY = CachedItemsCoords;
 
-        CachedCells.Add((item.Template, cell));
+        CachedCells.Add((item.Template!, cell));
         item.Cell = null;
     }
 
@@ -626,7 +624,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             return;
         }
 
-        var freeCell = CachedCells.LastOrDefault(i => (i.Template as IDataTemplateController).Id == (item.Template as IDataTemplateController).Id);
+        var freeCell = CachedCells.LastOrDefault(i => (i.Template as IDataTemplateController).Id == (item.Template as IDataTemplateController)!.Id);
         if (freeCell != default)
         {
             CachedCells.Remove(freeCell);
@@ -642,7 +640,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         else
         {
             var freeItem = LaidOutItems.FirstOrDefault(i =>
-                (i.Template as IDataTemplateController).Id == (item.Template as IDataTemplateController).Id
+                (i.Template as IDataTemplateController)!.Id == (item.Template as IDataTemplateController)!.Id
                 && !i.IsAttached && !i.IsOnScreen && i.Cell is not null);
             if (freeItem is not null)
             {
@@ -652,12 +650,12 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             }
             else if (createNewIfNoCached)
             {
-                item.Cell = Adapter!.OnCreateCell(item.Template, item.Position);
+                item.Cell = Adapter!.OnCreateCell(item.Template!, item.Position);
                 this.Add(item.Cell);
             }
         }
 
-        Adapter!.OnBindCell(item.Cell!, item.AdapterItem, item.Position);
+        Adapter!.OnBindCell(item.Cell!, item.AdapterItem!, item.Position);
 
         ArrangeItem(LaidOutItems, item, availableSpace);
     }
@@ -788,7 +786,12 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     protected abstract bool AdjustScrollIfNeeded(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Rect prevBoundsOfItem);
 
     #region ILayoutManager
-    public virtual Size Measure(double widthConstraint, double heightConstraint)
+    Size ILayoutManager.Measure(double widthConstraint, double heightConstraint)
+    {
+        return LayoutManagerMeasure(widthConstraint, heightConstraint);
+    }
+
+    public virtual Size LayoutManagerMeasure(double widthConstraint, double heightConstraint)
     {
         var items = CollectionsMarshal.AsSpan((this as IBindableLayout).Children as List<IView>);
         var length = items.Length;
