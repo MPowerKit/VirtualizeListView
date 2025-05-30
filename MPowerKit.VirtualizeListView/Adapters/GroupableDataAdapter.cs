@@ -308,7 +308,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
         var countToRemove = ResetGroups(e.OldItems.Cast<IEnumerable>());
         InternalItems.RemoveRange(realGroupIndex, countToRemove);
 
-        var flattenedItems = FlattenGroups(e.OldItems.Cast<IEnumerable>());
+        var flattenedItems = FlattenGroups(e.NewItems.Cast<IEnumerable>());
         InternalItems.InsertRange(realGroupIndex, flattenedItems);
 
         NotifyItemRangeChanged(e.OldStartingIndex, countToRemove, flattenedItems.Count);
