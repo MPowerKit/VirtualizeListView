@@ -44,9 +44,15 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     {
         base.OnParentChanging(args);
 
+        if (args.OldParent is null) return;
+
         SendListViewAdapterReset();
 
         ListView = null;
+        BindingContext = null;
+#if NET9_0_OR_GREATER
+        this.DisconnectHandlers();
+#endif
     }
 
     protected override void OnParentChanged()
@@ -67,7 +73,12 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected virtual bool DoesListViewHaveSize()
     {
-        return ListView is not null && !double.IsNaN(ListView.Width) && !double.IsNaN(ListView.Height) && ListView.Width >= 0d && ListView.Height >= 0d;
+        return ListView is not null
+            && !double.IsNaN(ListView.Width)
+            && !double.IsNaN(ListView.Height)
+            && ListView.Width >= 0d
+            && ListView.Height >= 0d
+            && this.Handler is not null;
     }
 
     public virtual void SendListViewAdapterSet()
@@ -141,6 +152,15 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         OnDrawOver();
     }
 
+    protected override void OnHandlerChanged()
+    {
+        base.OnHandlerChanged();
+
+        if (Handler is null) return;
+
+        InvalidateLayout();
+    }
+
     public virtual void SendListViewContentSizeChanged()
     {
         if (ListView is null) return;
@@ -175,14 +195,9 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     /// </summary>
     public virtual void InvalidateLayout()
     {
-        LaidOutItems.Clear();
-        CachedCells.Clear();
-        this.Clear();
-        (this as IView).InvalidateMeasure();
+        ClearItems();
 
-        if (!DoesListViewHaveSize()) return;
-
-        if (Adapter?.ItemsCount is null or 0) return;
+        if (!DoesListViewHaveSize() || Adapter?.ItemsCount is null or 0) return;
 
         var count = Adapter.ItemsCount;
 
@@ -204,6 +219,24 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         CreateCachePool(CachePoolSize);
 
         DrawAndTriggerResize();
+    }
+
+    protected virtual void ClearItems()
+    {
+        LaidOutItems.Clear();
+        CachedCells.Clear();
+        var items = this.Children.OfType<VisualElement>().ToList();
+        this.Clear();
+        DisconnectItems(items);
+        (this as IView).InvalidateMeasure();
+    }
+
+    protected virtual void DisconnectItems(IEnumerable<VisualElement> items)
+    {
+        foreach (var item in items)
+        {
+            item.DisconnectItem();
+        }
     }
 
     protected virtual void CreateCachePool(int poolSize)
@@ -651,6 +684,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             else if (createNewIfNoCached)
             {
                 item.Cell = Adapter!.OnCreateCell(item.Template!, item.Position);
+                MeasureItem(LaidOutItems, item, availableSpace);
                 this.Add(item.Cell);
             }
         }

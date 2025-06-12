@@ -3,7 +3,7 @@ using System.Collections.Specialized;
 
 namespace MPowerKit.VirtualizeListView;
 
-public class BindableLayout
+public static class BindableLayout
 {
     private static readonly Dictionary<IEnumerable, List<WeakReference<BindableObject>>> _bindableObjects = [];
 
@@ -118,7 +118,12 @@ public class BindableLayout
 
     private static void ClearItems(Layout layout)
     {
+        var items = layout.Children.OfType<VisualElement>().ToList();
         layout.Clear();
+        foreach (var item in items)
+        {
+            DisconnectItem(item);
+        }
     }
 
     private static void AddItems(Layout layout, IEnumerable? items, int index)
@@ -148,8 +153,22 @@ public class BindableLayout
 
         foreach (var item in items)
         {
+            var view = layout.ElementAt(index) as VisualElement;
             layout.RemoveAt(index);
+
+            DisconnectItem(view);
         }
+    }
+
+    public static void DisconnectItem(this VisualElement? visualElement)
+    {
+        if (visualElement is null) return;
+
+        visualElement.BindingContext = null;
+        visualElement.Behaviors?.Clear();
+#if NET9_0_OR_GREATER
+        visualElement.DisconnectHandlers();
+#endif
     }
 
     private static void MoveItems(Layout layout, IEnumerable? items, int oldIndex, int newIndex)
