@@ -108,6 +108,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         DetachDecorators();
 
+        ListView!.ItemDecorators.CollectionChanged -= ItemDecorators_CollectionChanged;
+
         adapter.DataSetChanged -= AdapterDataSetChanged;
         adapter.ItemMoved -= AdapterItemMoved;
         adapter.ItemRangeChanged -= AdapterItemRangeChanged;
@@ -123,13 +125,36 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         {
             item.OnAttached(ListView!, this, Adapter!);
         }
+
+        ListView!.ItemDecorators.CollectionChanged += ItemDecorators_CollectionChanged;
     }
 
     protected virtual void DetachDecorators()
     {
+        ListView!.ItemDecorators.CollectionChanged -= ItemDecorators_CollectionChanged;
+
         foreach (var item in ListView!.ItemDecorators)
         {
             item.OnDetached(ListView!, this, Adapter!);
+        }
+    }
+
+    private void ItemDecorators_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems is not null)
+        {
+            foreach (ItemDecorator item in e.OldItems)
+            {
+                item.OnDetached(ListView!, this, Adapter!);
+            }
+        }
+
+        if (e.NewItems is not null)
+        {
+            foreach (ItemDecorator item in e.NewItems)
+            {
+                item.OnAttached(ListView!, this, Adapter!);
+            }
         }
     }
 
