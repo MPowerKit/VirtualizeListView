@@ -61,6 +61,12 @@ builder
     .UseMPowerKitListView();
 ```
 
+and add in your xaml this namespace:
+
+```xaml
+xmlns:mpowerkit="clr-namespace:MPowerKit.VirtualizeListView;assembly=MPowerKit.VirtualizeListView"
+```
+
 and in your xaml just use as a regular ```CollectionView```.
 
 **Note: The root of the ItemTemplate has to be ```typeof(VirtualizeListViewCell)```, but group/header/footer templates are not allowed to have root of this type.**
