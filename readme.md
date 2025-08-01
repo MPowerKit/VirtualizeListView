@@ -27,6 +27,7 @@ So, under the hood it is a ```ScrollView``` with custom ```typeof(Layout)``` as 
 - [x] Grouping
 - [x] Collection padding
 - [x] Scroll orientation (collection orientation)
+- [x] Scroll to item
 - [x] Disable scrolling
 - [x] Header / Footer
 - [x] Load more

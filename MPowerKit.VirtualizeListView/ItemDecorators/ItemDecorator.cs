@@ -58,7 +58,7 @@ public class StickyHeaderItemDecorator : ItemDecorator
             item.Size = originalHeaderItem.Size;
             item.LeftTopWithMargin = originalHeaderItem.LeftTopWithMargin;
 
-            var cell = _dataAdapter.OnCreateCell(item.Template, item.Position);
+            var cell = _dataAdapter.OnCreateCell(item.Template!, item.Position);
             if (_stickyHeader is not null)
             {
                 _layoutManger.Remove(_stickyHeader);
@@ -66,7 +66,7 @@ public class StickyHeaderItemDecorator : ItemDecorator
             item.Cell = _stickyHeader = cell;
             _layoutManger.Add(_stickyHeader);
 
-            _dataAdapter.OnBindCell(_stickyHeader, item.AdapterItem, item.Position);
+            _dataAdapter.OnBindCell(_stickyHeader, item.AdapterItem!, item.Position);
             _stickyHeader.ZIndex = 1000;
             _stickyHeader.TranslationX = OffScreen;
             _stickyHeader.TranslationY = OffScreen;

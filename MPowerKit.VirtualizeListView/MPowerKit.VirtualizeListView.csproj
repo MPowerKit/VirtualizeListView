@@ -19,7 +19,7 @@
 		
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<Title>MPowerKit.VirtualizeListView</Title>
-		<Version>2.4.3</Version>
+		<Version>2.5.1</Version>
 		<Authors>MPowerKit,Alex Dobrynin</Authors>
 		<Description>MAUI Virtualize ListView with smooth scrolling and without platform-specific code</Description>
 		<Copyright>MPowerKit</Copyright>

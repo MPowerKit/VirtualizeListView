@@ -167,7 +167,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
     protected virtual int GetFlattenedGroupIndexOfGroup(IEnumerable group)
     {
-        return InternalItems.FindIndex(i => i is GroupItem groupItem && groupItem.Group == group);
+        return InternalItems.FindIndex(i => i is GroupItem groupItem && ReferenceEquals(groupItem.Group, group));
     }
 
     protected virtual int GetFlattenedGroupIndexForGroupIndex(int groupIndex)
@@ -468,7 +468,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
         var totalCount = InternalItems.Count;
 
         var prevGroupItems = InternalItems.Where(i => i is GroupItem groupItem and not GroupHeaderItem and not GroupFooterItem
-                                                        && groupItem.Group == group)
+                                                        && ReferenceEquals(groupItem.Group, group))
                                           .Select(i => i.Data)
                                           .ToList();
 

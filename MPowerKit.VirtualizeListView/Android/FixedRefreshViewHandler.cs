@@ -64,12 +64,12 @@ public class FixedRefreshViewHandler : ViewHandler<FixedRefreshView, FixedRefres
         else PlatformView.Refreshing = false;
     }
 
-    static void UpdateContent(FixedRefreshViewHandler handler)
+    private static void UpdateContent(FixedRefreshViewHandler handler)
     {
         handler.PlatformView.UpdateContent(handler.VirtualView.Content, handler.MauiContext);
     }
 
-    static void UpdateRefreshColor(FixedRefreshViewHandler handler)
+    private static void UpdateRefreshColor(FixedRefreshViewHandler handler)
     {
         var color = handler.VirtualView.RefreshColor?.ToInt();
         if (color is null) return;
@@ -77,7 +77,7 @@ public class FixedRefreshViewHandler : ViewHandler<FixedRefreshView, FixedRefres
         handler.PlatformView.SetColorSchemeColors(color.Value);
     }
 
-    static void UpdateIsRefreshing(FixedRefreshViewHandler handler)
+    private static void UpdateIsRefreshing(FixedRefreshViewHandler handler)
     {
         var virtualView = handler.VirtualView;
         var platformView = handler.PlatformView;
@@ -89,7 +89,7 @@ public class FixedRefreshViewHandler : ViewHandler<FixedRefreshView, FixedRefres
         platformView.Refreshing = refreshing;
     }
 
-    static void UpdateBackground(FixedRefreshViewHandler handler)
+    private static void UpdateBackground(FixedRefreshViewHandler handler)
     {
         var color = (handler.VirtualView as IView)?.Background?.ToColor()?.ToInt();
         if (color is null) return;

@@ -134,8 +134,8 @@ public class GridItemsLayoutManager : VirtualizeItemsLayoutManger
         if (IsOrientation(ScrollOrientation.Both) || item.Position < 0) return new();
 
         return IsOrientation(ScrollOrientation.Vertical)
-            ? new(item.Span * ((availableSpace.Width - (HorizontalItemsSpacing * (Span - 1))) / Span) + HorizontalItemsSpacing * (item.Span - 1), EstimatedSize)
-            : new(EstimatedSize, item.Span * ((availableSpace.Height - (VerticalItemSpacing * (Span - 1))) / Span) + VerticalItemSpacing * (item.Span - 1));
+            ? new(item.Span * ((availableSpace.Width - (HorizontalItemsSpacing * (Span - 1))) / Span) + HorizontalItemsSpacing * (item.Span - 1), EstimatedItemSize)
+            : new(EstimatedItemSize, item.Span * ((availableSpace.Height - (VerticalItemSpacing * (Span - 1))) / Span) + VerticalItemSpacing * (item.Span - 1));
     }
 
     protected override Thickness GetItemMargin(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)

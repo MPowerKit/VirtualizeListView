@@ -43,7 +43,7 @@ public class FixedRefreshViewHandler : ViewHandler<FixedRefreshView, FixedRefres
 
     protected override RefreshViewWrapper CreatePlatformView()
     {
-        return new();
+        return [];
     }
 
     protected override void ConnectHandler(RefreshViewWrapper platformView)
@@ -101,7 +101,7 @@ public class FixedRefreshViewHandler : ViewHandler<FixedRefreshView, FixedRefres
         handler.PlatformView.UserInteractionEnabled = refreshView.IsEnabled;
     }
 
-    static void UpdateIsRefreshing(FixedRefreshViewHandler handler)
+    private static void UpdateIsRefreshing(FixedRefreshViewHandler handler)
     {
         var virtualView = handler.VirtualView;
         var platformView = handler.PlatformView;
@@ -113,12 +113,12 @@ public class FixedRefreshViewHandler : ViewHandler<FixedRefreshView, FixedRefres
         platformView.IsRefreshingAnimated = refreshing;
     }
 
-    static void UpdateContent(FixedRefreshViewHandler handler)
+    private static void UpdateContent(FixedRefreshViewHandler handler)
     {
         handler.PlatformView.UpdateContent(handler.VirtualView.Content, handler.MauiContext);
     }
 
-    static void UpdateRefreshColor(FixedRefreshViewHandler handler)
+    private static void UpdateRefreshColor(FixedRefreshViewHandler handler)
     {
         var color = handler.VirtualView?.RefreshColor?.ToPlatform();
 
@@ -146,7 +146,7 @@ public class FixedRefreshViewHandler : ViewHandler<FixedRefreshView, FixedRefres
 
         public RefreshViewWrapper()
         {
-            RefreshControl = new();
+            RefreshControl = [];
             RefreshControlParent = this;
         }
 
@@ -292,7 +292,7 @@ public class FixedRefreshViewHandler : ViewHandler<FixedRefreshView, FixedRefres
 
         protected virtual void UpdateContentOffset(UIScrollView scrollView, nfloat offset, Action? completed = null)
         {
-            UIView.Animate(0.2, () => scrollView.ContentOffset = new(scrollView.ContentOffset.X, offset), completed);
+            UIView.Animate(0.2, () => scrollView.ContentOffset = new(scrollView.ContentOffset.X, offset), completed ?? (() => { }));
         }
 
         protected virtual bool TryRemoveRefresh(UIView view, int index = 0)

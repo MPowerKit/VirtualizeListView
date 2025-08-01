@@ -9,7 +9,6 @@ namespace MPowerKit.VirtualizeListView;
 public partial class VirtualizeListView : ScrollView
 {
     public event EventHandler<(double dx, double dy)>? AdjustScrollRequested;
-    public event EventHandler? Refreshing;
     public event EventHandler<object>? ItemAppearing;
     public event EventHandler<object>? ItemDisappearing;
     public event EventHandler<object>? ItemTapped;
@@ -215,7 +214,13 @@ public partial class VirtualizeListView : ScrollView
 
     protected virtual void OnLayoutManagerChanged()
     {
+        var prevLayoutManager = this.Content;
+
         this.Content = LayoutManager;
+
+#if NET9_0_OR_GREATER
+        prevLayoutManager?.DisconnectHandlers();
+#endif
     }
 
     protected virtual VirtualizeItemsLayoutManger? GetLayoutManger()
@@ -282,7 +287,7 @@ public partial class VirtualizeListView : ScrollView
 
         if (realPosition < realItemsCount - RemainingItemsThreshold) return;
 
-        if (PrevAppearedItem is null || PrevAppearedItem != item)
+        if (PrevAppearedItem is null || !ReferenceEquals(PrevAppearedItem, item))
         {
             PrevAppearedItem = item;
             if (ThresholdCommand?.CanExecute(null) is true)
@@ -372,6 +377,13 @@ public partial class VirtualizeListView : ScrollView
         return new Size(Math.Min(desiredWidth, widthConstraint), Math.Min(desiredHeight, heightConstraint));
     }
 #endif
+
+    public virtual async Task ScrollToItem(object item, ScrollToPosition scrollToPosition, bool animated)
+    {
+        if (LayoutManager is null) return;
+
+        await LayoutManager.ScrollToItem(item, scrollToPosition, animated);
+    }
 
     #region StickyHeaders
     public bool StickyHeaders
@@ -521,7 +533,7 @@ public partial class VirtualizeListView : ScrollView
     #region Header
     public object Header
     {
-        get { return (object)GetValue(HeaderProperty); }
+        get { return GetValue(HeaderProperty); }
         set { SetValue(HeaderProperty, value); }
     }
 
@@ -535,7 +547,7 @@ public partial class VirtualizeListView : ScrollView
     #region Footer
     public object Footer
     {
-        get { return (object)GetValue(FooterProperty); }
+        get { return GetValue(FooterProperty); }
         set { SetValue(FooterProperty, value); }
     }
 

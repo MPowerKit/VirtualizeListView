@@ -56,7 +56,7 @@ public static class BindableLayout
     {
         if (_bindableObjects.TryGetValue(itemsSource, out var bindableList))
         {
-            bindableList.RemoveAll(weakRef => !weakRef.TryGetTarget(out var target) || target == bindable);
+            bindableList.RemoveAll(weakRef => !weakRef.TryGetTarget(out var target) || ReferenceEquals(target, bindable));
 
             if (bindableList.Count == 0) _bindableObjects.Remove(itemsSource);
         }
@@ -116,7 +116,7 @@ public static class BindableLayout
         }
     }
 
-    private static void ClearItems(Layout layout)
+    public static void ClearItems(this Layout layout)
     {
         var items = layout.Children.OfType<VisualElement>().ToList();
         layout.Clear();

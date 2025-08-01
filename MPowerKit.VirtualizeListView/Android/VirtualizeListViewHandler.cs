@@ -17,7 +17,7 @@ public partial class VirtualizeListViewHandler : ScrollViewHandler
             new ContextThemeWrapper(MauiContext!.Context, Resource.Style.scrollViewTheme),
             null!,
             Resource.Attribute.scrollViewStyle,
-            VirtualView as VirtualizeListView)
+            (VirtualView as VirtualizeListView)!)
         {
             ClipToOutline = true,
             FillViewport = true
@@ -29,36 +29,37 @@ public partial class VirtualizeListViewHandler : ScrollViewHandler
 
 public class SmoothScrollView : MauiScrollView
 {
-    private OverScroller _scroller;
-
-    private VirtualizeListView _listView;
+    private OverScroller? _scroller;
+    private VirtualizeListView? _listView;
 
     public SmoothScrollView(Context context, VirtualizeListView listView) : base(context)
     {
-        Init(context, listView);
+        Init(listView);
     }
 
     public SmoothScrollView(Context context, Android.Util.IAttributeSet attrs, VirtualizeListView listView) : base(context, attrs)
     {
-        Init(context, listView);
+        Init(listView);
     }
 
     public SmoothScrollView(Context context, Android.Util.IAttributeSet attrs, int defStyleAttr, VirtualizeListView listView) : base(context, attrs, defStyleAttr)
     {
-        Init(context, listView);
+        Init(listView);
     }
 
-    private void Init(Context context, VirtualizeListView listView)
+    private void Init(VirtualizeListView listView)
     {
         var field = Java.Lang.Class.FromType(typeof(NestedScrollView)).GetDeclaredField("mScroller");
         field.Accessible = true;
 
-        _scroller = (field.Get(this) as OverScroller)!;
+        _scroller = field.Get(this) as OverScroller;
         _listView = listView;
     }
 
     public virtual void AdjustScroll(double dxdp, double dydp)
     {
+        if (_scroller is null) return;
+
         var dx = (int)this.Context.ToPixels(dxdp);
         var dy = (int)this.Context.ToPixels(dydp);
 
@@ -81,7 +82,7 @@ public class SmoothScrollView : MauiScrollView
 
     public override void Fling(int velocityY)
     {
-        velocityY = (int)(velocityY / (int)_listView.ScrollSpeed);
+        velocityY /= (int)(_listView?.ScrollSpeed ?? ScrollSpeed.Normal);
 
         base.Fling(velocityY);
     }
@@ -92,24 +93,17 @@ public class SmoothScrollView : MauiScrollView
 
         try
         {
-            if (!CanScrollVertically(1) || !CanScrollVertically(-1))
+            if (_scroller is not null && (!CanScrollVertically(1) || !CanScrollVertically(-1)) && !_scroller.IsFinished)
             {
-                if (!_scroller.IsFinished)
-                {
-                    _scroller.AbortAnimation();
-                }
-                return;
+                _scroller.AbortAnimation();
             }
         }
-        catch (Exception ex)
-        {
-
-        }
+        catch { }
     }
 
     public override void ComputeScroll()
     {
-        if (!_scroller.ComputeScrollOffset() || _scroller.IsFinished) return;
+        if (_scroller is null || !_scroller.ComputeScrollOffset() || _scroller.IsFinished) return;
 
         int oldY = ScrollY;
         int newY = _scroller.CurrY;

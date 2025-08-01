@@ -21,8 +21,8 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
         if (IsOrientation(ScrollOrientation.Both) || item.Position < 0) return new();
 
         return IsOrientation(ScrollOrientation.Vertical)
-            ? new(availableSpace.Width, EstimatedSize)
-            : new(EstimatedSize, availableSpace.Height);
+            ? new(availableSpace.Width, EstimatedItemSize)
+            : new(EstimatedItemSize, availableSpace.Height);
     }
 
     protected override Thickness GetItemMargin(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)

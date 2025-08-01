@@ -72,7 +72,7 @@ public class VirtualizeListViewItem
 
     public virtual void OnCellSizeChanged()
     {
-        if (Cell?.BindingContext is not null && Cell.BindingContext != AdapterItem.Data) return;
+        if (Cell?.BindingContext is not null && !ReferenceEquals(Cell.BindingContext, AdapterItem?.Data)) return;
 
         LayoutManager?.OnItemSizeChanged(this);
     }

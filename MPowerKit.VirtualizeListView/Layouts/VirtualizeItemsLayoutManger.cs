@@ -11,7 +11,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 {
     protected const double AutoSize = -1d;
     protected const double CachedItemsCoords = -1000000d;
-    protected static double EstimatedSize { get; set; } = 200d;
+    protected static double EstimatedItemSize { get; set; } = 200d;
 
     protected ScrollEventArgs PrevScroll { get; set; } = new(0d, 0d, 0d, 0d);
     protected Point PrevScrollBeforeSizeChange { get; set; }
@@ -50,9 +50,6 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         ListView = null;
         BindingContext = null;
-#if NET9_0_OR_GREATER
-        this.DisconnectHandlers();
-#endif
     }
 
     protected override void OnParentChanged()
@@ -220,7 +217,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     /// </summary>
     public virtual void InvalidateLayout()
     {
-        ClearItems();
+        ClearAll();
 
         if (!DoesListViewHaveSize() || Adapter?.ItemsCount is null or 0) return;
 
@@ -246,22 +243,12 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         DrawAndTriggerResize();
     }
 
-    protected virtual void ClearItems()
+    protected virtual void ClearAll()
     {
         LaidOutItems.Clear();
         CachedCells.Clear();
-        var items = this.Children.OfType<VisualElement>().ToList();
-        this.Clear();
-        DisconnectItems(items);
+        this.ClearItems();
         (this as IView).InvalidateMeasure();
-    }
-
-    protected virtual void DisconnectItems(IEnumerable<VisualElement> items)
-    {
-        foreach (var item in items)
-        {
-            item.DisconnectItem();
-        }
     }
 
     protected virtual void CreateCachePool(int poolSize)
@@ -561,15 +548,15 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             return;
         }
 
-        if (firstVisibleItem == itemToMove)
+        if (ReferenceEquals(firstVisibleItem, itemToMove))
         {
-            firstVisibleItem = itemsToRearrange.FirstOrDefault(i => i != itemToMove);
+            firstVisibleItem = itemsToRearrange.FirstOrDefault(i => !ReferenceEquals(i, itemToMove));
             prevVisibleCellBounds = firstVisibleItem?.Bounds ?? new();
             itemsToRearrange.Remove(itemToMove);
         }
-        else if (lastVisibleItem == itemToMove)
+        else if (ReferenceEquals(lastVisibleItem, itemToMove))
         {
-            lastVisibleItem = itemsToRearrange.LastOrDefault(i => i != itemToMove);
+            lastVisibleItem = itemsToRearrange.LastOrDefault(i => !ReferenceEquals(i, itemToMove));
             itemsToRearrange.Remove(itemToMove);
         }
 
@@ -647,9 +634,13 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         var sizeChanged = DrawAndTriggerResize();
 
+
+        if (reused && !sizeChanged)
+        {
 #if !MACIOS
-        if (reused && !sizeChanged) (this as IView).InvalidateMeasure();
+            (this as IView).InvalidateMeasure();
 #endif
+        }
     }
 
     protected virtual void DetachCell(VirtualizeListViewItem item)
@@ -831,6 +822,101 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         return IsOrientation(ScrollOrientation.Vertical)
             ? new(Math.Min(widthConstraint, availableSpace.Width), LaidOutItems[^1].RightBottomWithMargin.Y)
             : new(LaidOutItems[^1].RightBottomWithMargin.X, Math.Min(heightConstraint, availableSpace.Height));
+    }
+
+    public virtual async Task ScrollToItem(object item, ScrollToPosition scrollToPosition, bool animated)
+    {
+        var listViewItem = LaidOutItems.FirstOrDefault(i => ReferenceEquals(i.AdapterItem?.Data, item));
+        if (listViewItem is null) return;
+
+        if (listViewItem.IsOnScreen)
+        {
+            await ListView!.ScrollToAsync(listViewItem.Cell, scrollToPosition, animated);
+            return;
+        }
+
+        if (listViewItem.Position == 0)
+        {
+            await ListView!.ScrollToAsync(ListView.Padding.Left + listViewItem.LeftTop.X, ListView.Padding.Top + listViewItem.LeftTop.Y, animated);
+            return;
+        }
+
+        var (desiredX, newScrollToPositionX) = GetDesiredX(scrollToPosition);
+        var (desiredY, newScrollToPositionY) = GetDesiredY(scrollToPosition);
+
+        bool shouldAnimate = true;
+        while (ListView!.ScrollX != desiredX || ListView.ScrollY != desiredY)
+        {
+            await ListView.ScrollToAsync(desiredX, desiredY, animated & shouldAnimate);
+
+            (desiredX, newScrollToPositionX) = GetDesiredX(newScrollToPositionX);
+            (desiredY, newScrollToPositionY) = GetDesiredY(newScrollToPositionY);
+
+            shouldAnimate = false;
+        }
+
+        bool WhetherContentSizeBiggerThanSize(bool vertical)
+        {
+            return vertical
+                ? ListView!.ContentSize.Height > ListView.Height - ListView.Padding.VerticalThickness
+                : ListView!.ContentSize.Width > ListView.Width - ListView.Padding.HorizontalThickness;
+        }
+
+        (double, ScrollToPosition) GetDesiredX(ScrollToPosition scrollToPosition)
+        {
+            ScrollToPosition newScrollToPosition = scrollToPosition;
+            if (scrollToPosition is ScrollToPosition.MakeVisible)
+            {
+                if (ListView!.Padding.Left + listViewItem.LeftTop.X <= ListView.ScrollX)
+                {
+                    newScrollToPosition = ScrollToPosition.Start;
+                }
+                else if (ListView.Padding.Left + listViewItem.RightBottom.X >= ListView.ScrollX + ListView.Width)
+                {
+                    newScrollToPosition = ScrollToPosition.End;
+                }
+                else
+                {
+                    newScrollToPosition = ScrollToPosition.Center;
+                }
+            }
+
+            return (newScrollToPosition switch
+            {
+                ScrollToPosition.Start => WhetherContentSizeBiggerThanSize(false) ? ListView!.Padding.Left + listViewItem.LeftTop.X : 0d,
+                ScrollToPosition.Center => WhetherContentSizeBiggerThanSize(false) ? ListView!.Padding.Left + listViewItem.LeftTop.X + (listViewItem.RightBottom.X - listViewItem.LeftTop.X) / 2d - ListView.Width / 2d : 0d,
+                ScrollToPosition.End => WhetherContentSizeBiggerThanSize(false) ? ListView!.Padding.Left + listViewItem.RightBottom.X - ListView.Width : 0d,
+                _ => 0d,
+            }, newScrollToPosition);
+        }
+
+        (double, ScrollToPosition) GetDesiredY(ScrollToPosition scrollToPosition)
+        {
+            ScrollToPosition newScrollToPosition = scrollToPosition;
+            if (scrollToPosition is ScrollToPosition.MakeVisible)
+            {
+                if (ListView!.Padding.Top + listViewItem.LeftTop.Y <= ListView.ScrollY)
+                {
+                    newScrollToPosition = ScrollToPosition.Start;
+                }
+                else if (ListView.Padding.Top + listViewItem.RightBottom.Y >= ListView.ScrollY + ListView.Height)
+                {
+                    newScrollToPosition = ScrollToPosition.End;
+                }
+                else
+                {
+                    newScrollToPosition = ScrollToPosition.Center;
+                }
+            }
+
+            return (newScrollToPosition switch
+            {
+                ScrollToPosition.Start => WhetherContentSizeBiggerThanSize(true) ? ListView!.Padding.Top + listViewItem.LeftTop.Y : 0d,
+                ScrollToPosition.Center => WhetherContentSizeBiggerThanSize(true) ? ListView!.Padding.Top + listViewItem.LeftTop.Y + (listViewItem.RightBottom.Y - listViewItem.LeftTop.Y) / 2d - ListView.Height / 2d : 0d,
+                ScrollToPosition.End => WhetherContentSizeBiggerThanSize(true) ? ListView!.Padding.Top + listViewItem.RightBottom.Y - ListView.Height : 0d,
+                _ => 0d,
+            }, newScrollToPosition);
+        }
     }
 
     protected abstract void RepositionItemsFromIndex(IReadOnlyList<VirtualizeListViewItem> items, int index);
