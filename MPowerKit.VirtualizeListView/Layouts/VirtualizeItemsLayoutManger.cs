@@ -12,6 +12,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     protected const double AutoSize = -1d;
     protected const double CachedItemsCoords = -1000000d;
     protected static double EstimatedItemSize { get; set; } = 200d;
+    protected const int VisibleItemsCapacity = 50;
 
     protected ScrollEventArgs PrevScroll { get; set; } = new(0d, 0d, 0d, 0d);
     protected Point PrevScrollBeforeSizeChange { get; set; }
@@ -29,14 +30,16 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected List<(DataTemplate Template, CellHolder Cell)> CachedCells { get; } = [];
 
-    public List<VirtualizeListViewItem> VisibleItems => [.. LaidOutItems
-        .Where(i => i.IsOnScreen && i.IsAttached)];
+    public virtual HashSet<VirtualizeListViewItem> VisibleItems { get; protected set; } = new HashSet<VirtualizeListViewItem>(VisibleItemsCapacity);
 
-    public List<(AdapterItem Data, int Position)> VisibleDataItems => [.. LaidOutItems
-        .Where(i => i.IsOnScreen && i.IsAttached && i.Cell?.Children[0] is VirtualizeListViewCell)
+    public virtual List<(AdapterItem Data, int Position)> VisibleDataItems => [..VisibleItems
+        .Where(i => i.Cell?.Children[0] is VirtualizeListViewCell)
         .Select(i => (i.AdapterItem, i.Position))];
 
-    protected virtual Size AvailableSpace => GetAvailableSpace();
+    public Size AvailableSpace { get; set; }
+
+    protected virtual LayoutOptions ListViewHorizontalOptions => ListView?.HorizontalOptions ?? LayoutOptions.Fill;
+    protected virtual LayoutOptions ListViewVerticalOptions => ListView?.VerticalOptions ?? LayoutOptions.Fill;
 
     protected override ILayoutManager CreateLayoutManager() => this;
 
@@ -70,11 +73,12 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected virtual bool DoesListViewHaveSize()
     {
-        return ListView is not null
-            && !double.IsNaN(ListView.Width)
-            && !double.IsNaN(ListView.Height)
-            && ListView.Width >= 0d
-            && ListView.Height >= 0d
+        var listView = ListView;
+        return listView is not null
+            && !double.IsNaN(listView.Width)
+            && !double.IsNaN(listView.Height)
+            && listView.Width >= 0d
+            && listView.Height >= 0d
             && this.Handler is not null;
     }
 
@@ -187,7 +191,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     {
         if (ListView is null) return;
 
-        var newSpace = GetAvailableSpace();
+        var newSpace = AvailableSpace;
 
         if (newSpace == PrevAvailableSpace) return;
 
@@ -577,9 +581,6 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             ShiftItemsChunk(LaidOutItems, itemsToRearrange[^1].Position + 1, count);
         }
 
-        //if (firstVisibleItem is not null && AdjustScrollIfNeeded(LaidOutItems, firstVisibleItem, prevVisibleCellBounds)
-        //    && (ListView!.ScrollX != 0d || ListView.ScrollY != 0d)) return;
-
         UpdateItemsLayout(start, false);
     }
 
@@ -588,25 +589,28 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         ArrangeItem(LaidOutItems, item, AvailableSpace);
         ShiftItemsChunk(LaidOutItems, item.Position + 1, LaidOutItems.Count);
         UpdateItemsLayout(item.Position + 1, false);
+
+#if MACIOS
+        (ListView as IView)?.InvalidateMeasure();
+#endif
     }
 
     protected virtual void UpdateItemsLayout(int fromPosition, bool shouldAdjustScroll)
     {
-        var count = LaidOutItems.Count;
-
+        var laidOutItmes = LaidOutItems;
+        var count = laidOutItmes.Count;
         if (count == 0) return;
-
-        var control = ListView!;
 
         var availableSpace = AvailableSpace;
 
-        var spanList = CollectionsMarshal.AsSpan(LaidOutItems);
+        var spanList = CollectionsMarshal.AsSpan(laidOutItmes);
 
         for (int i = fromPosition; i < count; i++)
         {
             var item = spanList[i];
 
-            if (!item.IsOnScreen) DetachCell(item);
+            if (!item.IsOnScreen)
+                DetachCell(item);
         }
 
         bool reused = false;
@@ -625,15 +629,14 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
             if (item.Bounds == prevBounds) continue;
 
-            ShiftItemsChunk(LaidOutItems, item.Position + 1, count);
+            ShiftItemsChunk(laidOutItmes, item.Position + 1, count);
 
             if (!shouldAdjustScroll) continue;
 
-            AdjustScrollForItemBoundsChange(LaidOutItems, item, prevBounds);
+            AdjustScrollForItemBoundsChange(laidOutItmes, item, prevBounds);
         }
 
         var sizeChanged = DrawAndTriggerResize();
-
 
         if (reused && !sizeChanged)
         {
@@ -646,6 +649,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     protected virtual void DetachCell(VirtualizeListViewItem item)
     {
         if (!item.IsAttached || item.Cell is null) return;
+        VisibleItems.Remove(item);
 
         Adapter!.OnCellRecycled(item.Cell!, item.AdapterItem!, item.Position);
 
@@ -667,6 +671,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected virtual void ReuseCell(VirtualizeListViewItem item, bool createNewIfNoCached, Size availableSpace)
     {
+        VisibleItems.Add(item);
         if (item.Cell is not null)
         {
             ArrangeItem(LaidOutItems, item, availableSpace);
@@ -700,7 +705,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             else if (createNewIfNoCached)
             {
                 item.Cell = Adapter!.OnCreateCell(item.Template!, item.Position);
-                MeasureItem(LaidOutItems, item, availableSpace);
+                //Probably its not needed
+                //MeasureItem(LaidOutItems, item, availableSpace);
                 this.Add(item.Cell);
             }
         }
@@ -767,11 +773,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         return true;
     }
 
-    public virtual Size GetAvailableSpace()
-    {
-        return new(ListView!.Width - ListView.Padding.HorizontalThickness, ListView.Height - ListView.Padding.VerticalThickness);
-    }
-
+    [Obsolete("Needs to be reconsidered")]
     public virtual Size MeasureItem(VirtualizeListViewItem item, Size availableSpace)
     {
         if (IsOrientation(ScrollOrientation.Both)) return new();
@@ -819,9 +821,17 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     {
         if (IsOrientation(ScrollOrientation.Both) || LaidOutItems.Count == 0) return new();
 
+        var visibleItems = VisibleItems;
+
         return IsOrientation(ScrollOrientation.Vertical)
-            ? new(Math.Min(widthConstraint, availableSpace.Width), LaidOutItems[^1].RightBottomWithMargin.Y)
-            : new(LaidOutItems[^1].RightBottomWithMargin.X, Math.Min(heightConstraint, availableSpace.Height));
+            ? new(Math.Min(widthConstraint, ListViewHorizontalOptions == LayoutOptions.Fill
+                    ? availableSpace.Width
+                    : visibleItems.Count == 0 ? 0d : visibleItems.Max(i => i.MeasuredSize.Width)),
+                LaidOutItems[^1].RightBottomWithMargin.Y)
+            : new(LaidOutItems[^1].RightBottomWithMargin.X,
+                Math.Min(heightConstraint, ListViewVerticalOptions == LayoutOptions.Fill
+                    ? availableSpace.Height
+                    : visibleItems.Count == 0 ? 0d : visibleItems.Max(i => i.MeasuredSize.Height)));
     }
 
     public virtual async Task ScrollToItem(object item, ScrollToPosition scrollToPosition, bool animated)
@@ -962,8 +972,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             }
             else
 #endif
-            // this triggers item size change when needed
-            MeasureItem(LaidOutItems, view.Item!, availableSpace);
+                // this triggers item size change when needed
+                MeasureItem(LaidOutItems, view.Item!, availableSpace);
         }
 
         var desiredSize = GetDesiredLayoutSize(widthConstraint, heightConstraint, availableSpace);

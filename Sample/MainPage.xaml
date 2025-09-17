@@ -3,10 +3,13 @@
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:Sample"
+             xmlns:ios="clr-namespace:Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;assembly=Microsoft.Maui.Controls"
              xmlns:mpowerkit="clr-namespace:MPowerKit.VirtualizeListView;assembly=MPowerKit.VirtualizeListView"
+             ios:Page.UseSafeArea="True"
              BackgroundColor="Purple">
 
-    <Grid RowDefinitions="Auto,50,*">
+    <Grid RowDefinitions="Auto,50,*"
+          BackgroundColor="#44FFFFFF">
         <Entry TextChanged="Entry_TextChanged" />
         <Grid Grid.Row="1"
               ColumnDefinitions="*,*,*,*"
@@ -24,14 +27,18 @@
                     Text="Move" />
         </Grid>
 
-        <mpowerkit:FixedRefreshView Grid.Row="2"
-                                    Refreshing="FixedRefreshView_Refreshing">
+        <!--<mpowerkit:FixedRefreshView Grid.Row="2"
+                                    Refreshing="FixedRefreshView_Refreshing">-->
             <mpowerkit:VirtualizeListView x:Name="listView"
                                           Grid.Row="2"
                                           Padding="15"
+                                          Margin="15"
+                                          HorizontalOptions="Fill"
+                                          VerticalOptions="Fill"
+                                          Orientation="Vertical"
                                           BackgroundColor="Brown"
                                           IsGrouped="True"
-                                          StickyHeaders="True">
+                                          StickyHeaders="False">
                 <mpowerkit:VirtualizeListView.Resources>
                     <ResourceDictionary>
                         <Style TargetType="mpowerkit:LinearItemsLayoutManager">
@@ -41,7 +48,7 @@
                     </ResourceDictionary>
                 </mpowerkit:VirtualizeListView.Resources>
                 <mpowerkit:VirtualizeListView.ItemsLayout>
-                    <mpowerkit:LinearLayout InitialCachePoolSize="2"
+                    <mpowerkit:LinearLayout InitialCachePoolSize="0"
                                             ItemSpacing="15" />
                     <!--<mpowerkit:GridLayout HorizontalItemSpacing="15"
                                       Span="3"
@@ -165,7 +172,7 @@
             </mpowerkit:VirtualizeListView.ItemTemplate>-->
             </mpowerkit:VirtualizeListView>
 
-        </mpowerkit:FixedRefreshView>
+        <!--</mpowerkit:FixedRefreshView>-->
 
     </Grid>
 </ContentPage>

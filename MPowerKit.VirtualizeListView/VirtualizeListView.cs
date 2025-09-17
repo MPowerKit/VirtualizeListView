@@ -350,33 +350,32 @@ public partial class VirtualizeListView : ScrollView
             || (Orientation == ScrollOrientation.Neither && PrevScrollOrientation == orientation);
     }
 
-#if MACIOS
     protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
     {
+        if (LayoutManager is not null)
+            LayoutManager.AvailableSpace = new(widthConstraint - this.Padding.HorizontalThickness - Margin.HorizontalThickness, heightConstraint - this.Padding.VerticalThickness - Margin.VerticalThickness);
+
         var size = base.MeasureOverride(widthConstraint, heightConstraint);
-
-        var orientation = ScrollOrientation.Neither;
-        if (IsOrientation(ScrollOrientation.Both)) orientation = ScrollOrientation.Both;
-        else if (IsOrientation(ScrollOrientation.Vertical)) orientation = ScrollOrientation.Vertical;
-        else if (IsOrientation(ScrollOrientation.Horizontal)) orientation = ScrollOrientation.Horizontal;
-
+#if !MACIOS
+        return size;
+#else
         var desiredWidth = size.Width;
-        if (orientation is ScrollOrientation.Both or ScrollOrientation.Horizontal && HorizontalOptions != LayoutOptions.Fill)
+        if (HorizontalOptions != LayoutOptions.Fill)
         {
             desiredWidth = Padding.HorizontalThickness + Margin.HorizontalThickness
                 + (Content?.DesiredSize.Width ?? 0d);
         }
 
         var desiredHeight = size.Height;
-        if (orientation is ScrollOrientation.Both or ScrollOrientation.Vertical && VerticalOptions != LayoutOptions.Fill)
+        if (VerticalOptions != LayoutOptions.Fill)
         {
             desiredHeight = Padding.VerticalThickness + Margin.VerticalThickness
                 + (Content?.DesiredSize.Height ?? 0d);
         }
 
         return new Size(Math.Min(desiredWidth, widthConstraint), Math.Min(desiredHeight, heightConstraint));
-    }
 #endif
+    }
 
     public virtual async Task ScrollToItem(object item, ScrollToPosition scrollToPosition, bool animated)
     {
@@ -402,7 +401,7 @@ public partial class VirtualizeListView : ScrollView
     #region ItemDecorators
     public ObservableCollection<ItemDecorator> ItemDecorators
     {
-        get { return (ObservableCollection<ItemDecorator>)GetValue(ItemDecoratorsProperty); }
+        get => (ObservableCollection<ItemDecorator>)GetValue(ItemDecoratorsProperty);
     }
 
     public static readonly BindableProperty ItemDecoratorsProperty =
@@ -425,8 +424,8 @@ public partial class VirtualizeListView : ScrollView
     #region Adapter
     public DataAdapter Adapter
     {
-        get { return (DataAdapter)GetValue(AdapterProperty); }
-        protected set { SetValue(AdapterProperty, value); }
+        get => (DataAdapter)GetValue(AdapterProperty);
+        protected set => SetValue(AdapterProperty, value);
     }
 
     public static readonly BindableProperty AdapterProperty =

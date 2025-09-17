@@ -14,7 +14,7 @@ public class VirtualizeListViewItem
     }
 
     public int Position { get; set; } = -1;
-    public virtual bool IsOnScreen => IntersectsWithScrollVisibleRect();
+    public virtual bool IsOnScreen => IntersectsWithViewport();
     public bool IsAttached => Cell?.Attached ?? false;
     public DataTemplate? Template { get; set; }
     public AdapterItem? AdapterItem { get; set; }
@@ -37,16 +37,26 @@ public class VirtualizeListViewItem
         }
     }
 
+    public Size MeasuredSize { get; set; }
     public Size Size { get; set; }
     public Point LeftTopWithMargin { get; set; }
     public Thickness Margin { get; set; }
-    public Point LeftTop => new(LeftTopWithMargin.X + Margin.Left, LeftTopWithMargin.Y + Margin.Top);
+    public Point LeftTop
+    {
+        get
+        {
+            var leftTopWithMargin = LeftTopWithMargin;
+            var margin = Margin;
+            return new(leftTopWithMargin.X + margin.Left, leftTopWithMargin.Y + margin.Top);
+        }
+    }
     public Rect Bounds
     {
         get
         {
             var leftTop = LeftTop;
-            return new(leftTop.X, leftTop.Y, Size.Width, Size.Height);
+            var size = Size;
+            return new(leftTop.X, leftTop.Y, size.Width, size.Height);
         }
     }
     public Point RightBottom
@@ -62,7 +72,8 @@ public class VirtualizeListViewItem
         get
         {
             var rightBottom = RightBottom;
-            return new(rightBottom.X + Margin.Right, rightBottom.Y + Margin.Bottom);
+            var margin = Margin;
+            return new(rightBottom.X + margin.Right, rightBottom.Y + margin.Bottom);
         }
     }
 
@@ -77,18 +88,15 @@ public class VirtualizeListViewItem
         LayoutManager?.OnItemSizeChanged(this);
     }
 
-    protected virtual bool IntersectsWithScrollVisibleRect()
+    protected virtual bool IntersectsWithViewport()
     {
         var listview = LayoutManager.ListView!;
 
-        Rect itemBoundsWithCollectionPadding = new(
-            Bounds.X,
-            Bounds.Y,
-            Bounds.Width,
-            Bounds.Height);
+        var availableSpace = LayoutManager.AvailableSpace;
+        var listViewPadding = listview.Padding;
 
-        Rect visibleRect = new(listview.ScrollX - listview.Padding.Left, listview.ScrollY - listview.Padding.Top, listview.Width, listview.Height);
+        Rect visibleRect = new(listview.ScrollX - listViewPadding.Left, listview.ScrollY - listViewPadding.Top, availableSpace.Width + listViewPadding.HorizontalThickness, availableSpace.Height + listViewPadding.VerticalThickness);
 
-        return itemBoundsWithCollectionPadding.IntersectsWith(visibleRect);
+        return Bounds.IntersectsWith(visibleRect);
     }
 }

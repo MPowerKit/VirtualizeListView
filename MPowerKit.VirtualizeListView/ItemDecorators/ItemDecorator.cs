@@ -44,7 +44,7 @@ public class StickyHeaderItemDecorator : ItemDecorator
             || _listView.IsOrientation(ScrollOrientation.Both)) return;
 
         var visibleItems = _layoutManger.VisibleItems;
-        var firstVisibleItem = visibleItems.FirstOrDefault();
+        var firstVisibleItem = visibleItems.OrderBy(i => i.Position).FirstOrDefault();
         if (firstVisibleItem == default) return;
 
         var topChildPosition = firstVisibleItem.Position;
@@ -71,7 +71,7 @@ public class StickyHeaderItemDecorator : ItemDecorator
             _stickyHeader.TranslationX = OffScreen;
             _stickyHeader.TranslationY = OffScreen;
 
-            _layoutManger.MeasureItem(item, _layoutManger.GetAvailableSpace());
+            _layoutManger.MeasureItem(item, _layoutManger.AvailableSpace);
             (_stickyHeader as IView).Arrange(item.Bounds);
 
             _prevStickyHeaderItem = item;
@@ -166,7 +166,7 @@ public class StickyHeaderItemDecorator : ItemDecorator
         }
     }
 
-    private static VirtualizeListViewItem? GetChildInContact(List<VirtualizeListViewItem> visibleItems, VirtualizeListViewItem stickyHeaderItem, VirtualizeListView listView)
+    private static VirtualizeListViewItem? GetChildInContact(IEnumerable<VirtualizeListViewItem> visibleItems, VirtualizeListViewItem stickyHeaderItem, VirtualizeListView listView)
     {
         var stickyBounds = stickyHeaderItem.Bounds;
 
@@ -175,24 +175,36 @@ public class StickyHeaderItemDecorator : ItemDecorator
             var offsetY = listView.ScrollY - listView.Padding.Top;
             var contactPoint = offsetY + stickyBounds.Height;
 
-            for (int i = 0; i < visibleItems.Count; i++)
+            foreach (var child in visibleItems)
             {
-                var child = visibleItems[i];
                 var childBounds = child.Bounds;
                 if (childBounds.Top <= contactPoint && childBounds.Bottom > contactPoint) return child;
             }
+
+            //for (int i = 0; i < visibleItems.Count; i++)
+            //{
+            //    var child = visibleItems[i];
+            //    var childBounds = child.Bounds;
+            //    if (childBounds.Top <= contactPoint && childBounds.Bottom > contactPoint) return child;
+            //}
         }
         else
         {
             var offsetX = listView.ScrollX - listView.Padding.Left;
             var contactPoint = offsetX + stickyBounds.Width;
 
-            for (int i = 0; i < visibleItems.Count; i++)
+            foreach (var child in visibleItems)
             {
-                var child = visibleItems[i];
                 var childBounds = child.Bounds;
                 if (childBounds.Left <= contactPoint && childBounds.Right > contactPoint) return child;
             }
+
+            //for (int i = 0; i < visibleItems.Count; i++)
+            //{
+            //    var child = visibleItems[i];
+            //    var childBounds = child.Bounds;
+            //    if (childBounds.Left <= contactPoint && childBounds.Right > contactPoint) return child;
+            //}
         }
 
         return null;

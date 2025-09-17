@@ -1,4 +1,6 @@
-﻿namespace MPowerKit.VirtualizeListView;
+﻿using System.Linq;
+
+namespace MPowerKit.VirtualizeListView;
 
 public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
 {
@@ -78,12 +80,36 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
             measure = iview.Measure(GetEstimatedItemSize(item, availableSpace).Width, double.PositiveInfinity);
 
             item.Size = new(availableSpace.Width, measure.Height);
+            if (ListViewHorizontalOptions == LayoutOptions.Fill)
+            {
+                width = availableSpace.Width;
+            }
+            else
+            {
+                var visibleItems = VisibleItems.Except([item]).ToList();
+                var maxWidth = visibleItems.Count == 0 ? 0d : visibleItems.Max(i => i.MeasuredSize.Width);
+                width = Math.Max(measure.Width, maxWidth);
+            }
+            item.MeasuredSize = measure;
+            item.Size = new(width, measure.Height);
         }
         else
         {
             measure = iview.Measure(double.PositiveInfinity, GetEstimatedItemSize(item, availableSpace).Height);
 
-            item.Size = new(measure.Width, availableSpace.Height);
+            double height;
+            if (ListViewVerticalOptions == LayoutOptions.Fill)
+            {
+                height = availableSpace.Height;
+            }
+            else
+            {
+                var visibleItems = VisibleItems.Except([item]).ToList();
+                var maxHeight = visibleItems.Count == 0 ? 0d : visibleItems.Max(i => i.MeasuredSize.Height);
+                height = Math.Max(measure.Height, maxHeight);
+            }
+            item.MeasuredSize = measure;
+            item.Size = new(measure.Width, height);
         }
 
         return measure;
@@ -91,10 +117,8 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
 
     protected override void ArrangeItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Size availableSpace)
     {
-        var count = items.Count;
-
         if (IsOrientation(ScrollOrientation.Both)
-            || count == 0 || item.Position == -1) return;
+            || items.Count == 0 || item.Position == -1) return;
 
         var prevIndex = item.Position - 1;
         var prevItemRightBottom = prevIndex == -1 ? new() : items[prevIndex].RightBottomWithMargin;
