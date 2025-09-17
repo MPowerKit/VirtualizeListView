@@ -79,7 +79,7 @@ public class LinearItemsLayoutManager : VirtualizeItemsLayoutManger
         {
             measure = iview.Measure(GetEstimatedItemSize(item, availableSpace).Width, double.PositiveInfinity);
 
-            item.Size = new(availableSpace.Width, measure.Height);
+            double width;
             if (ListViewHorizontalOptions == LayoutOptions.Fill)
             {
                 width = availableSpace.Width;
