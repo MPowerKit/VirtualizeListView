@@ -591,7 +591,9 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         UpdateItemsLayout(item.Position + 1, false);
 
 #if MACIOS
-        (ListView as IView)?.InvalidateMeasure();
+        (this.Parent as IView)?.InvalidateMeasure();
+#elif WINDOWS
+        (this.Parent?.Parent as IView)?.InvalidateMeasure();
 #endif
     }
 
@@ -609,8 +611,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         {
             var item = spanList[i];
 
-            if (!item.IsOnScreen)
-                DetachCell(item);
+            if (!item.IsOnScreen) DetachCell(item);
         }
 
         bool reused = false;
@@ -972,8 +973,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             }
             else
 #endif
-                // this triggers item size change when needed
-                MeasureItem(LaidOutItems, view.Item!, availableSpace);
+            // this triggers item size change when needed
+            MeasureItem(LaidOutItems, view.Item!, availableSpace);
         }
 
         var desiredSize = GetDesiredLayoutSize(widthConstraint, heightConstraint, availableSpace);
@@ -1020,6 +1021,16 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         return new(bounds.Width, bounds.Height);
     }
+
+#if !MACIOS
+    protected override Size ArrangeOverride(Rect bounds)
+    {
+        var newBounds = new Rect(bounds.X, bounds.Y, this.DesiredSize.Width, this.DesiredSize.Height);
+
+        return base.ArrangeOverride(newBounds);
+    }
+#endif
+
     #endregion
 
     #region IDisposable

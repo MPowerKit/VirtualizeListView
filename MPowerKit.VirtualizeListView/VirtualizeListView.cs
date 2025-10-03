@@ -352,29 +352,29 @@ public partial class VirtualizeListView : ScrollView
 
     protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
     {
+        var horizontalPadding = Padding.HorizontalThickness + Margin.HorizontalThickness;
+        var verticalPadding = Padding.VerticalThickness + Margin.VerticalThickness;
+
         if (LayoutManager is not null)
-            LayoutManager.AvailableSpace = new(widthConstraint - this.Padding.HorizontalThickness - Margin.HorizontalThickness, heightConstraint - this.Padding.VerticalThickness - Margin.VerticalThickness);
+            LayoutManager.AvailableSpace = new(widthConstraint - horizontalPadding, heightConstraint - verticalPadding);
 
         var size = base.MeasureOverride(widthConstraint, heightConstraint);
-#if !MACIOS
-        return size;
-#else
+
         var desiredWidth = size.Width;
         if (HorizontalOptions != LayoutOptions.Fill)
         {
-            desiredWidth = Padding.HorizontalThickness + Margin.HorizontalThickness
+            desiredWidth = horizontalPadding
                 + (Content?.DesiredSize.Width ?? 0d);
         }
 
         var desiredHeight = size.Height;
         if (VerticalOptions != LayoutOptions.Fill)
         {
-            desiredHeight = Padding.VerticalThickness + Margin.VerticalThickness
+            desiredHeight = verticalPadding
                 + (Content?.DesiredSize.Height ?? 0d);
         }
 
         return new Size(Math.Min(desiredWidth, widthConstraint), Math.Min(desiredHeight, heightConstraint));
-#endif
     }
 
     public virtual async Task ScrollToItem(object item, ScrollToPosition scrollToPosition, bool animated)
