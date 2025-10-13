@@ -242,9 +242,12 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             ReuseCell(item, true, availableSpace);
         }
 
-        CreateCachePool(CachePoolSize);
-
         DrawAndTriggerResize();
+
+        this.Dispatcher.Dispatch(() =>
+        {
+            CreateCachePool(CachePoolSize);
+        });
     }
 
     protected virtual void ClearAll()
@@ -586,12 +589,12 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     public virtual void OnItemSizeChanged(VirtualizeListViewItem item)
     {
-        ArrangeItem(LaidOutItems, item, AvailableSpace);
-        ShiftItemsChunk(LaidOutItems, item.Position + 1, LaidOutItems.Count);
-        UpdateItemsLayout(item.Position + 1, false);
+        //ArrangeItem(LaidOutItems, item, AvailableSpace);
+        //ShiftItemsChunk(LaidOutItems, item.Position + 1, LaidOutItems.Count);
+        //UpdateItemsLayout(item.Position + 1, false);
 
 #if MACIOS
-        (this.Parent as IView)?.InvalidateMeasure();
+        //(this.Parent as IView)?.InvalidateMeasure();
 #elif WINDOWS
         (this.Parent?.Parent as IView)?.InvalidateMeasure();
 #endif
@@ -607,49 +610,81 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         var spanList = CollectionsMarshal.AsSpan(laidOutItmes);
 
+        //bool shouldInvalidate = false;
+
         for (int i = fromPosition; i < count; i++)
         {
             var item = spanList[i];
+
+            if (!item.IsOnScreen && item.IsAttached)
+            {
+                (this as IView)!.InvalidateMeasure();
+                return;
+            }
+        }
+
+        //CacheItems(fromPosition);
+
+        for (int i = fromPosition; i < count; i++)
+        {
+            var item = spanList[i];
+
+            if (item.IsOnScreen && !item.IsAttached)
+            {
+                (this as IView)!.InvalidateMeasure();
+                return;
+            }
+
+            //if (!item.IsOnScreen || item.IsAttached) continue;
+
+            //shouldInvalidate = true;
+
+            //break;
+
+            //var prevBounds = item.Bounds;
+
+            //ReuseCell(item, true, availableSpace);
+
+            //reused = true;
+
+            //if (item.Bounds == prevBounds) continue;
+
+            //ShiftItemsChunk(laidOutItmes, item.Position + 1, count);
+
+            //if (!shouldAdjustScroll) continue;
+
+            //AdjustScrollForItemBoundsChange(laidOutItmes, item, prevBounds);
+        }
+
+        //if (shouldInvalidate) (this as IView)!.InvalidateMeasure();
+
+        //var sizeChanged = DrawAndTriggerResize();
+
+        //if (reused && !sizeChanged)
+        //{
+        //#if !MACIOS
+        //(this as IView).InvalidateMeasure();
+        //#endif
+        //}
+    }
+
+    protected virtual void CacheItems(int fromPosition)
+    {
+        var items = LaidOutItems;
+        var count = items.Count;
+
+        for (int i = fromPosition; i < count; i++)
+        {
+            var item = items[i];
 
             if (!item.IsOnScreen) DetachCell(item);
-        }
-
-        bool reused = false;
-
-        for (int i = fromPosition; i < count; i++)
-        {
-            var item = spanList[i];
-
-            if (!item.IsOnScreen || item.IsAttached) continue;
-
-            var prevBounds = item.Bounds;
-
-            ReuseCell(item, true, availableSpace);
-
-            reused = true;
-
-            if (item.Bounds == prevBounds) continue;
-
-            ShiftItemsChunk(laidOutItmes, item.Position + 1, count);
-
-            if (!shouldAdjustScroll) continue;
-
-            AdjustScrollForItemBoundsChange(laidOutItmes, item, prevBounds);
-        }
-
-        var sizeChanged = DrawAndTriggerResize();
-
-        if (reused && !sizeChanged)
-        {
-#if !MACIOS
-            (this as IView).InvalidateMeasure();
-#endif
         }
     }
 
     protected virtual void DetachCell(VirtualizeListViewItem item)
     {
         if (!item.IsAttached || item.Cell is null) return;
+
         VisibleItems.Remove(item);
 
         Adapter!.OnCellRecycled(item.Cell!, item.AdapterItem!, item.Position);
@@ -675,7 +710,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         VisibleItems.Add(item);
         if (item.Cell is not null)
         {
-            ArrangeItem(LaidOutItems, item, availableSpace);
+            //ArrangeItem(LaidOutItems, item, availableSpace);
             return;
         }
 
@@ -687,10 +722,10 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             var cell = freeCell.Cell;
 
             item.Cell = cell;
-#if ANDROID
+            //#if ANDROID
             cell.TranslationX = 0d;
             cell.TranslationY = 0d;
-#endif
+            //#endif
         }
         else
         {
@@ -714,7 +749,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         Adapter!.OnBindCell(item.Cell!, item.AdapterItem!, item.Position);
 
-        ArrangeItem(LaidOutItems, item, availableSpace);
+        //ArrangeItem(LaidOutItems, item, availableSpace);
     }
 
     protected virtual bool DrawAndTriggerResize()
@@ -722,10 +757,10 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 #if !ANDROID
         // on Android we must arrange item in real bounds, not using translation
         // issue #5
-        foreach (var item in LaidOutItems.Where(i => i.Cell is not null))
-        {
-            DrawItem(LaidOutItems, item);
-        }
+        //foreach (var item in LaidOutItems.Where(i => i.Cell is not null))
+        //{
+        //DrawItem(LaidOutItems, item);
+        //}
 #endif
         return TriggerResizeLayout();
     }
@@ -949,77 +984,155 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     public virtual Size LayoutManagerMeasure(double widthConstraint, double heightConstraint)
     {
-        var items = CollectionsMarshal.AsSpan((this as IBindableLayout).Children as List<IView>);
-        var length = items.Length;
-
+        var items = LaidOutItems;
+        var length = this.LaidOutItems.Count;
         var availableSpace = AvailableSpace;
 
-        for (int n = 0; n < length; n++)
+        var width = availableSpace.Width;
+
+        var maxWidth = 0d;
+
+        for (int i = 0; i < length; i++)
         {
-            var child = items[n];
-            if (child is not CellHolder view) continue;
-
-            if ((view.IsCached || !view.Item!.IsAttached)
-#if MACIOS
-                // on Mac and iOS we must to do initial measure of not measured items
-                && view.WasMeasured
-#endif
-                ) continue;
-
-#if MACIOS
-            if (!view.WasMeasured && view.Item is null)
+            var item = items[i];
+            if (!item.IsOnScreen)
             {
-                child.Measure(double.PositiveInfinity, double.PositiveInfinity);
+                DetachCell(item);
+                continue;
             }
-            else
-#endif
-            // this triggers item size change when needed
-            MeasureItem(LaidOutItems, view.Item!, availableSpace);
+
+            var prevBounds = item.Bounds;
+
+            if (item.Cell is null)
+                ReuseCell(item, true, availableSpace);
+
+            var iview = item.Cell as IView;
+            var measure = iview!.Measure(GetEstimatedItemSize(item, availableSpace).Width, double.PositiveInfinity);
+
+            item.MeasuredSize = measure;
+            item.Size = new(width, measure.Height);
+            maxWidth = Math.Max(maxWidth, measure.Width);
+
+            if (item.Bounds == prevBounds) continue;
+
+            ShiftItemsChunk(items, item.Position + 1, length);
+
+            AdjustScrollForItemBoundsChange(items, item, prevBounds);
         }
 
-        var desiredSize = GetDesiredLayoutSize(widthConstraint, heightConstraint, availableSpace);
+        Size desiredSize = new(Math.Min(widthConstraint, ListViewHorizontalOptions == LayoutOptions.Fill
+                    ? availableSpace.Width
+                    : maxWidth),
+                length == 0 ? 0 : items[^1].RightBottomWithMargin.Y);
+
+        //        var items = CollectionsMarshal.AsSpan((this as IBindableLayout).Children as List<IView>);
+        //        var length = items.Length;
+
+        //        var availableSpace = AvailableSpace;
+
+        //        for (int n = 0; n < length; n++)
+        //        {
+        //            var child = items[n];
+        //            if (child is not CellHolder view) continue;
+
+        //            if ((view.IsCached || !view.Item!.IsAttached)
+        //#if MACIOS
+        //                // on Mac and iOS we must to do initial measure of not measured items
+        //                && view.WasMeasured
+        //#endif
+        //                ) continue;
+
+        //#if MACIOS
+        //            if (!view.WasMeasured && view.Item is null)
+        //            {
+        //                child.Measure(double.PositiveInfinity, double.PositiveInfinity);
+        //            }
+        //            else
+        //#endif
+        //            // this triggers item size change when needed
+        //            MeasureItem(LaidOutItems, view.Item!, availableSpace);
+        //        }
+
+        //var desiredSize = GetDesiredLayoutSize(widthConstraint, heightConstraint, availableSpace);
         return desiredSize;
     }
 
     public virtual Size ArrangeChildren(Rect bounds)
     {
-        var items = CollectionsMarshal.AsSpan((this as IBindableLayout).Children as List<IView>);
-        var length = items.Length;
+        var items = VisibleItems.OrderBy(i => i.Position).ToList();
+        var length = items.Count;
 
-        for (int n = 0; n < length; n++)
+        var maxWidth = items.Max(i => i.MeasuredSize.Width);
+
+        foreach (var item in items)
         {
-            var child = items[n];
+            var iview = item.Cell as IView;
 
-            if (child is not CellHolder view) continue;
+            Rect newBounds = new(item.LeftTop, new(maxWidth, item.MeasuredSize.Height));
 
-            if ((view.IsCached || !view.Item!.IsAttached)
-#if MACIOS
-                // on Mac and iOS we must to do initial arrange of not arranged items
-                && view.WasArranged
-#endif
-                ) continue;
+            //if (newBounds == item.Cell!.Bounds) continue;
 
-            Point loc =
-#if ANDROID
-                // on Android we must arrange item in real bounds, not using translation
-                // issue #5
-                view.Item.LeftTop;
-#else
-                new(0d, 0d);
-#endif
-
-            Size size = view.Item?.Size ?? new(view.DesiredSize.Width, view.DesiredSize.Height);
-
-            Rect newBounds = new(loc, size);
-
-#if MACIOS
-            // on other platforms we need to arrange items anyway
-            if (view.Bounds == newBounds) continue;
-#endif
-            child.Arrange(newBounds);
+            iview!.Arrange(new(item.LeftTop, new(maxWidth, item.MeasuredSize.Height)));
         }
 
         return new(bounds.Width, bounds.Height);
+    }
+
+    //    public virtual Size ArrangeChildren(Rect bounds)
+    //    {
+    //        var items = CollectionsMarshal.AsSpan((this as IBindableLayout).Children as List<IView>);
+    //        var length = items.Length;
+
+    //        for (int n = 0; n < length; n++)
+    //        {
+    //            var child = items[n];
+
+    //            if (child is not CellHolder view) continue;
+
+    //            if ((view.IsCached || !view.Item!.IsAttached)
+    //#if MACIOS
+    //                        // on Mac and iOS we must to do initial arrange of not arranged items
+    //                        && view.WasArranged
+    //#endif
+    //                ) continue;
+
+    //            Point loc =
+    //#if ANDROID
+    //                        // on Android we must arrange item in real bounds, not using translation
+    //                        // issue #5
+    //                        view.Item.LeftTop;
+    //#else
+    //                new(0d, 0d);
+    //#endif
+
+    //            Size size = view.Item?.Size ?? new(view.DesiredSize.Width, view.DesiredSize.Height);
+
+    //            Rect newBounds = new(loc, size);
+
+    //#if MACIOS
+    //                    // on other platforms we need to arrange items anyway
+    //                    if (view.Bounds == newBounds) continue;
+    //#endif
+    //            child.Arrange(newBounds);
+    //        }
+
+    //        return new(bounds.Width, bounds.Height);
+    //    }
+
+    protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
+    {
+        var layout = this as Microsoft.Maui.ILayout;
+
+        var margin = this.Margin;
+        var marginHorizontal = margin.HorizontalThickness;
+        var marginVertical = margin.VerticalThickness;
+
+        widthConstraint -= marginHorizontal;
+        heightConstraint -= marginVertical;
+
+        var desiredSize = this.Handler?.GetDesiredSize(widthConstraint, heightConstraint) ?? Size.Zero;
+
+        return new(desiredSize.Width + marginHorizontal, desiredSize.Height + marginVertical);
     }
 
 #if !MACIOS

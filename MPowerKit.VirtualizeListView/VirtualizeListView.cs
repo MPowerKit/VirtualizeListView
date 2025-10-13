@@ -234,17 +234,17 @@ public partial class VirtualizeListView : ScrollView
                 BindingContext = null
             };
         }
-        else if (ItemsLayout is GridLayout gridLayout)
-        {
-            return new GridItemsLayoutManager()
-            {
-                VerticalItemSpacing = gridLayout.VerticalItemSpacing,
-                HorizontalItemsSpacing = gridLayout.HorizontalItemSpacing,
-                Span = gridLayout.Span,
-                CachePoolSize = gridLayout.InitialCachePoolSize,
-                BindingContext = null
-            };
-        }
+        //else if (ItemsLayout is GridLayout gridLayout)
+        //{
+        //    return new GridItemsLayoutManager()
+        //    {
+        //        VerticalItemSpacing = gridLayout.VerticalItemSpacing,
+        //        HorizontalItemsSpacing = gridLayout.HorizontalItemSpacing,
+        //        Span = gridLayout.Span,
+        //        CachePoolSize = gridLayout.InitialCachePoolSize,
+        //        BindingContext = null
+        //    };
+        //}
 
         return null;
     }
@@ -349,6 +349,17 @@ public partial class VirtualizeListView : ScrollView
         return Orientation == orientation
             || (Orientation == ScrollOrientation.Neither && PrevScrollOrientation == orientation);
     }
+
+    //protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
+    //{
+    //    var horizontalPadding = Padding.HorizontalThickness + Margin.HorizontalThickness;
+    //    var verticalPadding = Padding.VerticalThickness + Margin.VerticalThickness;
+
+    //    if (LayoutManager is not null)
+    //        LayoutManager.AvailableSpace = new(widthConstraint - horizontalPadding, heightConstraint - verticalPadding);
+
+    //    return base.MeasureOverride(widthConstraint, heightConstraint);
+    //}
 
     protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
     {

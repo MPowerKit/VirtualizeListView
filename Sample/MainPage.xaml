@@ -2,14 +2,14 @@
 <ContentPage x:Class="Sample.MainPage"
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:local="clr-namespace:Sample"
              xmlns:ios="clr-namespace:Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;assembly=Microsoft.Maui.Controls"
+             xmlns:local="clr-namespace:Sample"
              xmlns:mpowerkit="clr-namespace:MPowerKit.VirtualizeListView;assembly=MPowerKit.VirtualizeListView"
              ios:Page.UseSafeArea="True"
              BackgroundColor="Purple">
 
-    <Grid RowDefinitions="Auto,50,*"
-          BackgroundColor="#44FFFFFF">
+    <Grid BackgroundColor="#44FFFFFF"
+          RowDefinitions="Auto,50,*">
         <Entry TextChanged="Entry_TextChanged" />
         <Grid Grid.Row="1"
               ColumnDefinitions="*,*,*,*"
@@ -29,114 +29,114 @@
 
         <!--<mpowerkit:FixedRefreshView Grid.Row="2"
                                     Refreshing="FixedRefreshView_Refreshing">-->
-            <mpowerkit:VirtualizeListView x:Name="listView"
-                                          Grid.Row="2"
-                                          Padding="15"
-                                          Margin="15"
-                                          HorizontalOptions="Fill"
-                                          VerticalOptions="Fill"
-                                          Orientation="Vertical"
-                                          BackgroundColor="Brown"
-                                          IsGrouped="True"
-                                          StickyHeaders="False">
-                <mpowerkit:VirtualizeListView.Resources>
-                    <ResourceDictionary>
-                        <Style TargetType="mpowerkit:LinearItemsLayoutManager">
-                            <Setter Property="BackgroundColor"
-                                    Value="Orange" />
-                        </Style>
-                    </ResourceDictionary>
-                </mpowerkit:VirtualizeListView.Resources>
-                <mpowerkit:VirtualizeListView.ItemsLayout>
-                    <mpowerkit:LinearLayout InitialCachePoolSize="0"
-                                            ItemSpacing="15" />
-                    <!--<mpowerkit:GridLayout HorizontalItemSpacing="15"
+        <mpowerkit:VirtualizeListView x:Name="listView"
+                                      Grid.Row="2"
+                                      Margin="15"
+                                      Padding="15"
+                                      BackgroundColor="Brown"
+                                      HorizontalOptions="Start"
+                                      IsGrouped="True"
+                                      Orientation="Vertical"
+                                      StickyHeaders="False"
+                                      VerticalOptions="Fill">
+            <mpowerkit:VirtualizeListView.Resources>
+                <ResourceDictionary>
+                    <Style TargetType="mpowerkit:LinearItemsLayoutManager">
+                        <Setter Property="BackgroundColor"
+                                Value="Orange" />
+                    </Style>
+                </ResourceDictionary>
+            </mpowerkit:VirtualizeListView.Resources>
+            <mpowerkit:VirtualizeListView.ItemsLayout>
+                <mpowerkit:LinearLayout InitialCachePoolSize="0"
+                                        ItemSpacing="15" />
+                <!--<mpowerkit:GridLayout HorizontalItemSpacing="15"
                                       Span="3"
                                       VerticalItemSpacing="15" />-->
-                </mpowerkit:VirtualizeListView.ItemsLayout>
+            </mpowerkit:VirtualizeListView.ItemsLayout>
 
-                <mpowerkit:VirtualizeListView.GroupHeaderTemplate>
-                    <DataTemplate x:DataType="local:ItemsGroup">
-                        <Grid Padding="15"
-                              BackgroundColor="Aqua">
-                            <Label Text="{Binding Key}"
-                                   TextColor="Black" />
-                        </Grid>
-                    </DataTemplate>
-                </mpowerkit:VirtualizeListView.GroupHeaderTemplate>
-                <mpowerkit:VirtualizeListView.ItemTemplate>
-                    <local:ItemTemplateSelector>
-                        <local:ItemTemplateSelector.EvenTemplate>
-                            <DataTemplate x:DataType="local:Item">
-                                <mpowerkit:VirtualizeListViewCell BackgroundColor="Red">
-                                    <Grid ColumnDefinitions="Auto,*"
-                                          ColumnSpacing="15"
-                                          RowDefinitions="Auto,Auto,*"
-                                          RowSpacing="10">
-                                        <Grid.GestureRecognizers>
-                                            <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped" />
-                                        </Grid.GestureRecognizers>
-                                        <Image Aspect="AspectFill"
-                                               HeightRequest="{Binding Height}"
-                                               Source="{Binding Image}"
-                                               WidthRequest="{Binding Height}" />
-                                        <StackLayout Grid.Column="1"
-                                                     VerticalOptions="Center">
-                                            <Label FontAttributes="Bold"
-                                                   FontSize="22"
-                                                   Text="{Binding Title}" />
-                                            <Label FontSize="16"
-                                                   Text="{Binding Id}" />
-                                        </StackLayout>
-                                        <Entry Grid.Row="1"
-                                               Grid.ColumnSpan="2" />
-                                        <Label Grid.Row="2"
-                                               Grid.ColumnSpan="2"
-                                               FontAttributes="Italic"
-                                               FontSize="18"
-                                               LineBreakMode="WordWrap"
-                                               Text="{Binding Description}" />
-                                    </Grid>
-                                </mpowerkit:VirtualizeListViewCell>
-                            </DataTemplate>
-                        </local:ItemTemplateSelector.EvenTemplate>
-                        <local:ItemTemplateSelector.UnevenTemplate>
-                            <DataTemplate x:DataType="local:Item">
-                                <mpowerkit:VirtualizeListViewCell BackgroundColor="Green">
-                                    <Grid ColumnDefinitions="Auto,*"
-                                          ColumnSpacing="15"
-                                          RowDefinitions="Auto,Auto,*"
-                                          RowSpacing="10">
-                                        <Grid.GestureRecognizers>
-                                            <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped" />
-                                        </Grid.GestureRecognizers>
-                                        <Image Aspect="AspectFill"
-                                               HeightRequest="{Binding Height}"
-                                               Source="{Binding Image}"
-                                               WidthRequest="{Binding Height}" />
-                                        <StackLayout Grid.Column="1"
-                                                     VerticalOptions="Center">
-                                            <Label FontAttributes="Bold"
-                                                   FontSize="22"
-                                                   Text="{Binding Title}" />
-                                            <Label FontSize="16"
-                                                   Text="{Binding Id}" />
-                                        </StackLayout>
-                                        <Entry Grid.Row="1"
-                                               Grid.ColumnSpan="2" />
-                                        <Label Grid.Row="2"
-                                               Grid.ColumnSpan="2"
-                                               FontAttributes="Italic"
-                                               FontSize="18"
-                                               LineBreakMode="WordWrap"
-                                               Text="{Binding Description}" />
-                                    </Grid>
-                                </mpowerkit:VirtualizeListViewCell>
-                            </DataTemplate>
-                        </local:ItemTemplateSelector.UnevenTemplate>
-                    </local:ItemTemplateSelector>
-                </mpowerkit:VirtualizeListView.ItemTemplate>
-                <!--<mpowerkit:VirtualizeListView.ItemTemplate>
+            <mpowerkit:VirtualizeListView.GroupHeaderTemplate>
+                <DataTemplate x:DataType="local:ItemsGroup">
+                    <Grid Padding="15"
+                          BackgroundColor="Aqua">
+                        <Label Text="{Binding Key}"
+                               TextColor="Black" />
+                    </Grid>
+                </DataTemplate>
+            </mpowerkit:VirtualizeListView.GroupHeaderTemplate>
+            <mpowerkit:VirtualizeListView.ItemTemplate>
+                <local:ItemTemplateSelector>
+                    <local:ItemTemplateSelector.EvenTemplate>
+                        <DataTemplate x:DataType="local:Item">
+                            <mpowerkit:VirtualizeListViewCell BackgroundColor="Red">
+                                <Grid ColumnDefinitions="Auto,*"
+                                      ColumnSpacing="15"
+                                      RowDefinitions="Auto,Auto,*"
+                                      RowSpacing="10">
+                                    <Grid.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped" />
+                                    </Grid.GestureRecognizers>
+                                    <Image Aspect="AspectFill"
+                                           HeightRequest="{Binding Height}"
+                                           Source="{Binding Image}"
+                                           WidthRequest="{Binding Height}" />
+                                    <StackLayout Grid.Column="1"
+                                                 VerticalOptions="Center">
+                                        <Label FontAttributes="Bold"
+                                               FontSize="22"
+                                               Text="{Binding Title}" />
+                                        <Label FontSize="16"
+                                               Text="{Binding Id}" />
+                                    </StackLayout>
+                                    <Entry Grid.Row="1"
+                                           Grid.ColumnSpan="2" />
+                                    <Label Grid.Row="2"
+                                           Grid.ColumnSpan="2"
+                                           FontAttributes="Italic"
+                                           FontSize="18"
+                                           LineBreakMode="WordWrap"
+                                           Text="{Binding Description}" />
+                                </Grid>
+                            </mpowerkit:VirtualizeListViewCell>
+                        </DataTemplate>
+                    </local:ItemTemplateSelector.EvenTemplate>
+                    <local:ItemTemplateSelector.UnevenTemplate>
+                        <DataTemplate x:DataType="local:Item">
+                            <mpowerkit:VirtualizeListViewCell BackgroundColor="Green">
+                                <Grid ColumnDefinitions="Auto,*"
+                                      ColumnSpacing="15"
+                                      RowDefinitions="Auto,Auto,*"
+                                      RowSpacing="10">
+                                    <Grid.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped" />
+                                    </Grid.GestureRecognizers>
+                                    <Image Aspect="AspectFill"
+                                           HeightRequest="{Binding Height}"
+                                           Source="{Binding Image}"
+                                           WidthRequest="{Binding Height}" />
+                                    <StackLayout Grid.Column="1"
+                                                 VerticalOptions="Center">
+                                        <Label FontAttributes="Bold"
+                                               FontSize="22"
+                                               Text="{Binding Title}" />
+                                        <Label FontSize="16"
+                                               Text="{Binding Id}" />
+                                    </StackLayout>
+                                    <Entry Grid.Row="1"
+                                           Grid.ColumnSpan="2" />
+                                    <Label Grid.Row="2"
+                                           Grid.ColumnSpan="2"
+                                           FontAttributes="Italic"
+                                           FontSize="18"
+                                           LineBreakMode="WordWrap"
+                                           Text="{Binding Description}" />
+                                </Grid>
+                            </mpowerkit:VirtualizeListViewCell>
+                        </DataTemplate>
+                    </local:ItemTemplateSelector.UnevenTemplate>
+                </local:ItemTemplateSelector>
+            </mpowerkit:VirtualizeListView.ItemTemplate>
+            <!--<mpowerkit:VirtualizeListView.ItemTemplate>
                 <DataTemplate x:DataType="local:Item">
                     <mpowerkit:VirtualizeListViewCell BackgroundColor="Red">
                         <Grid ColumnDefinitions="Auto,*"
@@ -170,7 +170,7 @@
                     </mpowerkit:VirtualizeListViewCell>
                 </DataTemplate>
             </mpowerkit:VirtualizeListView.ItemTemplate>-->
-            </mpowerkit:VirtualizeListView>
+        </mpowerkit:VirtualizeListView>
 
         <!--</mpowerkit:FixedRefreshView>-->
 
