@@ -369,23 +369,23 @@ public partial class VirtualizeListView : ScrollView
         if (LayoutManager is not null)
             LayoutManager.AvailableSpace = new(widthConstraint - horizontalPadding, heightConstraint - verticalPadding);
 
-        var size = base.MeasureOverride(widthConstraint, heightConstraint);
+        base.MeasureOverride(widthConstraint, heightConstraint);
 
-        var desiredWidth = size.Width;
+        var desiredWidth = widthConstraint;
         if (HorizontalOptions != LayoutOptions.Fill)
         {
             desiredWidth = horizontalPadding
                 + (Content?.DesiredSize.Width ?? 0d);
         }
 
-        var desiredHeight = size.Height;
+        var desiredHeight = heightConstraint;
         if (VerticalOptions != LayoutOptions.Fill)
         {
             desiredHeight = verticalPadding
                 + (Content?.DesiredSize.Height ?? 0d);
         }
 
-        return new Size(Math.Min(desiredWidth, widthConstraint), Math.Min(desiredHeight, heightConstraint));
+        return new(Math.Min(desiredWidth, widthConstraint), Math.Min(desiredHeight, heightConstraint));
     }
 
     public virtual async Task ScrollToItem(object item, ScrollToPosition scrollToPosition, bool animated)

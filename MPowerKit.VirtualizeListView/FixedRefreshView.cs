@@ -10,14 +10,37 @@ public class FixedRefreshView : RefreshView
     protected bool PrevEnabled { get; set; }
     protected bool PrevPullRefreshEnabled { get; set; }
 
-    protected override void OnSizeAllocated(double width, double height)
+#if !WINDOWS
+    protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
     {
-        base.OnSizeAllocated(width, height);
+        if (this.Content is not null)
+        {
+            var padding = this.Padding;
+            var margin = this.Margin;
 
-#if ANDROID || IOS
-        Content?.Layout(new Rect(0, 0, width - Padding.HorizontalThickness, height - Padding.VerticalThickness));
-#endif
+            (this.Content as IView)!.Measure(
+                widthConstraint - padding.HorizontalThickness - margin.HorizontalThickness,
+                heightConstraint - padding.VerticalThickness - margin.VerticalThickness);
+        }
+
+        return base.MeasureOverride(widthConstraint, heightConstraint);
     }
+
+    protected override Size ArrangeOverride(Rect bounds)
+    {
+        var size = base.ArrangeOverride(bounds);
+
+        if (this.Content is not null)
+        {
+            var measure = this.Content.DesiredSize;
+            var padding = this.Padding;
+
+            (this.Content as IView).Arrange(new(new(padding.Left, padding.Top), measure));
+        }
+
+        return size;
+    }
+#endif
 
     protected virtual void Refresh()
     {
