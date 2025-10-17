@@ -38,6 +38,16 @@ public class VirtualizeListViewItem
     }
 
     public Size MeasuredSize { get; set; }
+    public Size MeasuredSizeWithMargin
+    {
+        get
+        {
+            var measuredSize = MeasuredSize;
+            var margin = Margin;
+            return new(measuredSize.Width + margin.HorizontalThickness, measuredSize.Height + margin.VerticalThickness);
+        }
+    }
+
     public Size Size { get; set; }
     public Point LeftTopWithMargin { get; set; }
     public Thickness Margin { get; set; }
@@ -83,20 +93,22 @@ public class VirtualizeListViewItem
 
     public virtual void OnCellSizeChanged()
     {
-        if (Cell?.BindingContext is not null && !ReferenceEquals(Cell.BindingContext, AdapterItem?.Data)) return;
+        var bindingContext = Cell?.BindingContext;
+
+        if (bindingContext is not null && !ReferenceEquals(bindingContext, AdapterItem?.Data)) return;
 
         LayoutManager?.OnItemSizeChanged(this);
     }
 
     protected virtual bool IntersectsWithViewport()
     {
-        var listview = LayoutManager.ListView!;
+        //var listview = LayoutManager.ListView!;
 
-        var availableSpace = LayoutManager.AvailableSpace;
-        var listViewPadding = listview.Padding;
+        //var availableSpace = listview.Bounds.Size;// LayoutManager.AvailableSpace;
+        //var listViewPadding = listview.Padding;
 
-        Rect visibleRect = new(listview.ScrollX - listViewPadding.Left, listview.ScrollY - listViewPadding.Top, availableSpace.Width + listViewPadding.HorizontalThickness, availableSpace.Height + listViewPadding.VerticalThickness);
+        //Rect visibleRect = new(listview.ScrollX - listViewPadding.Left, listview.ScrollY - listViewPadding.Top, availableSpace.Width, availableSpace.Height);
 
-        return Bounds.IntersectsWith(visibleRect);
+        return Bounds.IntersectsWith(LayoutManager.Viewport);
     }
 }

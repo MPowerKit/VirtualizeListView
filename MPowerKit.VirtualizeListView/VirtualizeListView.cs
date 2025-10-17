@@ -6,7 +6,7 @@ using System.Windows.Input;
 
 namespace MPowerKit.VirtualizeListView;
 
-public partial class VirtualizeListView : ScrollView
+public partial class VirtualizeListView : ScrollView//, ICrossPlatformLayout
 {
     public event EventHandler<(double dx, double dy)>? AdjustScrollRequested;
     public event EventHandler<object>? ItemAppearing;
@@ -350,6 +350,49 @@ public partial class VirtualizeListView : ScrollView
             || (Orientation == ScrollOrientation.Neither && PrevScrollOrientation == orientation);
     }
 
+    public virtual async Task ScrollToItem(object item, ScrollToPosition scrollToPosition, bool animated)
+    {
+        if (LayoutManager is null) return;
+
+        await LayoutManager.ScrollToItem(item, scrollToPosition, animated);
+    }
+
+    protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
+    {
+        var s = base.MeasureOverride(widthConstraint, heightConstraint);
+        return s;
+    }
+
+    //private PropertyInfo? _propertyInfo;
+    //Size ICrossPlatformLayout.CrossPlatformMeasure(double widthConstraint, double heightConstraint)
+    //{
+    //    if ((this as IContentView)?.PresentedContent is not IView content)
+    //    {
+    //        _propertyInfo ??= typeof(ScrollView).GetProperty(nameof(ContentSize), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+    //        _propertyInfo?.SetValue(this, Size.Zero);
+    //        return ContentSize;
+    //    }
+
+    //    switch (Orientation)
+    //    {
+    //        case ScrollOrientation.Horizontal:
+    //            widthConstraint = double.PositiveInfinity;
+    //            break;
+    //        case ScrollOrientation.Neither:
+    //        case ScrollOrientation.Both:
+    //            heightConstraint = double.PositiveInfinity;
+    //            widthConstraint = double.PositiveInfinity;
+    //            break;
+    //        case ScrollOrientation.Vertical:
+    //        default:
+    //            heightConstraint = double.PositiveInfinity;
+    //            break;
+    //    }
+
+    //    content.Measure(widthConstraint, heightConstraint);
+    //    return content.DesiredSize;
+    //}
+
     //protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
     //{
     //    var horizontalPadding = Padding.HorizontalThickness + Margin.HorizontalThickness;
@@ -358,41 +401,45 @@ public partial class VirtualizeListView : ScrollView
     //    if (LayoutManager is not null)
     //        LayoutManager.AvailableSpace = new(widthConstraint - horizontalPadding, heightConstraint - verticalPadding);
 
-    //    return base.MeasureOverride(widthConstraint, heightConstraint);
+    //    var size = base.MeasureOverride(widthConstraint, heightConstraint);
+
+    //    var desiredWidth = widthConstraint;
+    //    if (HorizontalOptions != LayoutOptions.Fill)
+    //    {
+    //        desiredWidth = horizontalPadding
+    //            + (Content?.DesiredSize.Width ?? 0d);
+    //    }
+
+    //    var desiredHeight = heightConstraint;
+    //    if (VerticalOptions != LayoutOptions.Fill)
+    //    {
+    //        desiredHeight = verticalPadding
+    //            + (Content?.DesiredSize.Height ?? 0d);
+    //    }
+
+    //    return new(Math.Min(desiredWidth, widthConstraint), Math.Min(desiredHeight, heightConstraint));
     //}
 
-    protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
+    protected virtual double ResolveConstraints(double externalConstraint, double explicitLength, double measuredLength, double min = 0d, double max = double.PositiveInfinity)
     {
-        var horizontalPadding = Padding.HorizontalThickness + Margin.HorizontalThickness;
-        var verticalPadding = Padding.VerticalThickness + Margin.VerticalThickness;
+        var length = IsExplicitSet(explicitLength) ? explicitLength : measuredLength;
 
-        if (LayoutManager is not null)
-            LayoutManager.AvailableSpace = new(widthConstraint - horizontalPadding, heightConstraint - verticalPadding);
-
-        base.MeasureOverride(widthConstraint, heightConstraint);
-
-        var desiredWidth = widthConstraint;
-        if (HorizontalOptions != LayoutOptions.Fill)
+        if (max < length)
         {
-            desiredWidth = horizontalPadding
-                + (Content?.DesiredSize.Width ?? 0d);
+            length = max;
         }
 
-        var desiredHeight = heightConstraint;
-        if (VerticalOptions != LayoutOptions.Fill)
+        if (min > length)
         {
-            desiredHeight = verticalPadding
-                + (Content?.DesiredSize.Height ?? 0d);
+            length = min;
         }
 
-        return new(Math.Min(desiredWidth, widthConstraint), Math.Min(desiredHeight, heightConstraint));
+        return Math.Min(length, externalConstraint);
     }
 
-    public virtual async Task ScrollToItem(object item, ScrollToPosition scrollToPosition, bool animated)
+    protected virtual bool IsExplicitSet(double value)
     {
-        if (LayoutManager is null) return;
-
-        await LayoutManager.ScrollToItem(item, scrollToPosition, animated);
+        return !double.IsNaN(value);
     }
 
     #region StickyHeaders

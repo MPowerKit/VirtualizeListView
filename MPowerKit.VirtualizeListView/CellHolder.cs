@@ -3,9 +3,9 @@
 public class CellHolder : Grid
 {
     public VirtualizeListViewItem? Item { get; set; }
-    public bool IsCached => Item is null;
-    public bool WasArranged { get; protected set; }
-    public bool WasMeasured { get; protected set; }
+    //public bool IsCached => Item is null;
+    //public bool WasArranged { get; protected set; }
+    //public bool WasMeasured { get; protected set; }
     public bool Attached { get; set; }
 
     public View? Content
@@ -21,18 +21,6 @@ public class CellHolder : Grid
 
             this.Add(value);
         }
-    }
-
-    protected override Size ArrangeOverride(Rect bounds)
-    {
-        WasArranged = true;
-        return base.ArrangeOverride(bounds);
-    }
-
-    protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
-    {
-        WasMeasured = true;
-        return base.MeasureOverride(widthConstraint, heightConstraint);
     }
 
     protected override void OnSizeAllocated(double width, double height)

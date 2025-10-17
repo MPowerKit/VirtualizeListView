@@ -41,6 +41,8 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     protected virtual LayoutOptions ListViewHorizontalOptions => ListView?.HorizontalOptions ?? LayoutOptions.Fill;
     protected virtual LayoutOptions ListViewVerticalOptions => ListView?.VerticalOptions ?? LayoutOptions.Fill;
 
+    public Rect Viewport { get; protected set; }
+
     protected override ILayoutManager CreateLayoutManager() => this;
 
     protected override void OnParentChanging(ParentChangingEventArgs args)
@@ -171,6 +173,12 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     {
         if (ListView is null) return;
 
+        var listView = ListView;
+        var padding = listView.Padding;
+        var availableSpace = listView.Bounds.Size;
+
+        Viewport = new(e.ScrollX - padding.Left, e.ScrollY - padding.Top, availableSpace.Width, availableSpace.Height);
+
         var newScroll = e - PrevScroll;
         UpdateItemsLayout(0, true);
         PrevScroll = newScroll;
@@ -191,11 +199,11 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     {
         if (ListView is null) return;
 
-        var newSpace = AvailableSpace;
+        //var newSpace = AvailableSpace;
 
-        if (newSpace == PrevAvailableSpace) return;
+        //if (newSpace == PrevAvailableSpace) return;
 
-        PrevAvailableSpace = newSpace;
+        //PrevAvailableSpace = newSpace;
 
         try
         {
@@ -242,7 +250,9 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             ReuseCell(item, true, availableSpace);
         }
 
-        DrawAndTriggerResize();
+        (this as IView)!.InvalidateMeasure();
+
+        //DrawAndTriggerResize();
 
         this.Dispatcher.Dispatch(() =>
         {
@@ -606,15 +616,15 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         var count = laidOutItmes.Count;
         if (count == 0) return;
 
-        var availableSpace = AvailableSpace;
+        //var availableSpace = AvailableSpace;
 
-        var spanList = CollectionsMarshal.AsSpan(laidOutItmes);
+        //var spanList = CollectionsMarshal.AsSpan(laidOutItmes);
 
         //bool shouldInvalidate = false;
 
         for (int i = fromPosition; i < count; i++)
         {
-            var item = spanList[i];
+            var item = laidOutItmes[i];
 
             if (!item.IsOnScreen && item.IsAttached)
             {
@@ -627,7 +637,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         for (int i = fromPosition; i < count; i++)
         {
-            var item = spanList[i];
+            var item = laidOutItmes[i];
 
             if (item.IsOnScreen && !item.IsAttached)
             {
@@ -986,12 +996,14 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     {
         var items = LaidOutItems;
         var length = this.LaidOutItems.Count;
-        var availableSpace = AvailableSpace;
+        var listView = ListView!;
+        var padding = listView.Padding;
+        var listViewBounds = listView.Bounds.Size; //AvailableSpace;
+        Size availableSpace = new(listViewBounds.Width - padding.HorizontalThickness, listViewBounds.Height - padding.VerticalThickness);
 
-        var width = availableSpace.Width;
+        Viewport = new(listView.ScrollX - padding.Left, listView.ScrollY - padding.Top, listViewBounds.Width, listViewBounds.Height);
 
         var maxWidth = 0d;
-
         for (int i = 0; i < length; i++)
         {
             var item = items[i];
@@ -1006,12 +1018,14 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             if (item.Cell is null)
                 ReuseCell(item, true, availableSpace);
 
-            var iview = item.Cell as IView;
+            var cell = item.Cell!;
+            var iview = cell as IView;
+
             var measure = iview!.Measure(GetEstimatedItemSize(item, availableSpace).Width, double.PositiveInfinity);
 
             item.MeasuredSize = measure;
-            item.Size = new(width, measure.Height);
-            maxWidth = Math.Max(maxWidth, measure.Width);
+            item.Size = new(availableSpace.Width, measure.Height);
+            maxWidth = Math.Max(maxWidth, item.MeasuredSizeWithMargin.Width);
 
             if (item.Bounds == prevBounds) continue;
 
@@ -1020,10 +1034,11 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             AdjustScrollForItemBoundsChange(items, item, prevBounds);
         }
 
-        Size desiredSize = new(Math.Min(widthConstraint, ListViewHorizontalOptions == LayoutOptions.Fill
-                    ? availableSpace.Width
-                    : maxWidth),
-                length == 0 ? 0 : items[^1].RightBottomWithMargin.Y);
+        Size desiredSize = new(
+            Math.Min(widthConstraint, ListViewHorizontalOptions == LayoutOptions.Fill
+                ? availableSpace.Width
+                : maxWidth),
+            length == 0 ? 0 : items[^1].RightBottomWithMargin.Y);
 
         //        var items = CollectionsMarshal.AsSpan((this as IBindableLayout).Children as List<IView>);
         //        var length = items.Length;
@@ -1062,20 +1077,43 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         var items = VisibleItems.OrderBy(i => i.Position).ToList();
         var length = items.Count;
 
-        var maxWidth = items.Max(i => i.MeasuredSize.Width);
+        var boundsWidth = bounds.Width;
+
+        double maxMeasureedWidth = 0d;
+        double maxMeasuredWidthWithMargin = 0d;
+
+        if (ListViewHorizontalOptions != LayoutOptions.Fill)
+        {
+            if (length > 0)
+            {
+                var maxItem = items.MaxBy(i => i.MeasuredSize);
+
+                maxMeasureedWidth = maxItem.MeasuredSize.Width;
+                maxMeasuredWidthWithMargin = maxItem.MeasuredSizeWithMargin.Width;
+            }
+        }
+
+        var maxWidth = ListViewHorizontalOptions != LayoutOptions.Fill
+            ? Math.Min(length == 0 ? 0d : items.Max(i => i.MeasuredSizeWithMargin.Width), boundsWidth)
+            : boundsWidth;
 
         foreach (var item in items)
         {
-            var iview = item.Cell as IView;
+            var cell = item.Cell!;
 
-            Rect newBounds = new(item.LeftTop, new(maxWidth, item.MeasuredSize.Height));
+            var iview = cell as IView;
 
-            //if (newBounds == item.Cell!.Bounds) continue;
+            var measuredSize = item.MeasuredSize;
 
-            iview!.Arrange(new(item.LeftTop, new(maxWidth, item.MeasuredSize.Height)));
+            Rect newBounds = new(item.LeftTop, new(maxWidth, measuredSize.Height));
+
+#if MACIOS
+            if (newBounds == cell.Bounds) continue;
+#endif
+            iview!.Arrange(newBounds);
         }
 
-        return new(bounds.Width, bounds.Height);
+        return new(maxWidth, bounds.Height);
     }
 
     //    public virtual Size ArrangeChildren(Rect bounds)
@@ -1119,29 +1157,29 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     //        return new(bounds.Width, bounds.Height);
     //    }
 
-    protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
-    {
-        var layout = this as Microsoft.Maui.ILayout;
+    //protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
+    //{
+    //    var layout = this as Microsoft.Maui.ILayout;
 
-        var margin = this.Margin;
-        var marginHorizontal = margin.HorizontalThickness;
-        var marginVertical = margin.VerticalThickness;
+    //    var margin = this.Margin;
+    //    var marginHorizontal = margin.HorizontalThickness;
+    //    var marginVertical = margin.VerticalThickness;
 
-        widthConstraint -= marginHorizontal;
-        heightConstraint -= marginVertical;
+    //    widthConstraint -= marginHorizontal;
+    //    heightConstraint -= marginVertical;
 
-        var desiredSize = this.Handler?.GetDesiredSize(widthConstraint, heightConstraint) ?? Size.Zero;
+    //    var desiredSize = this.Handler?.GetDesiredSize(widthConstraint, heightConstraint) ?? Size.Zero;
 
-        return new(desiredSize.Width + marginHorizontal, desiredSize.Height + marginVertical);
-    }
+    //    return new(desiredSize.Width + marginHorizontal, desiredSize.Height + marginVertical);
+    //}
 
 #if !MACIOS
-    protected override Size ArrangeOverride(Rect bounds)
-    {
-        var newBounds = new Rect(bounds.X, bounds.Y, this.DesiredSize.Width, this.DesiredSize.Height);
+    //protected override Size ArrangeOverride(Rect bounds)
+    //{
+    //    var newBounds = new Rect(bounds.X, bounds.Y, this.DesiredSize.Width, this.DesiredSize.Height);
 
-        return base.ArrangeOverride(newBounds);
-    }
+    //    return base.ArrangeOverride(newBounds);
+    //}
 #endif
 
     #endregion
