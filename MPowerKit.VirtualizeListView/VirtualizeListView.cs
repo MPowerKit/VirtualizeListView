@@ -179,8 +179,8 @@ public partial class VirtualizeListView : ScrollView
 #if MACIOS
         var scroll = this.Handler?.PlatformView as UIKit.UIScrollView;
         scroll!.DecelerationRate = ScrollSpeed is ScrollSpeed.Normal
-            ? UIKit.UIScrollView.DecelerationRateFast
-            : UIKit.UIScrollView.DecelerationRateNormal;
+            ? UIKit.UIScrollView.DecelerationRateNormal
+            : UIKit.UIScrollView.DecelerationRateFast;
 #endif
     }
 
