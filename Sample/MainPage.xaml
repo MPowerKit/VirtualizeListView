@@ -29,8 +29,7 @@
 
         <!--<mpowerkit:FixedRefreshView Grid.Row="2"
                                     Refreshing="FixedRefreshView_Refreshing">-->
-        <ContentView Grid.Row="2"
-                     HorizontalOptions="Fill">
+        <mpowerkit:FixedRefreshView Grid.Row="2">
 
             <mpowerkit:VirtualizeListView x:Name="listView"
                                           Grid.Row="2"
@@ -41,7 +40,7 @@
                                           IsGrouped="True"
                                           Orientation="Vertical"
                                           StickyHeaders="False"
-                                          VerticalOptions="Fill">
+                                          VerticalOptions="Start">
                 <mpowerkit:VirtualizeListView.Resources>
                     <ResourceDictionary>
                         <Style TargetType="mpowerkit:LinearItemsLayoutManager">
@@ -174,7 +173,7 @@
                 </DataTemplate>
             </mpowerkit:VirtualizeListView.ItemTemplate>-->
             </mpowerkit:VirtualizeListView>
-        </ContentView>
+        </mpowerkit:FixedRefreshView>
 
         <!--</mpowerkit:FixedRefreshView>-->
 

@@ -357,11 +357,11 @@ public partial class VirtualizeListView : ScrollView//, ICrossPlatformLayout
         await LayoutManager.ScrollToItem(item, scrollToPosition, animated);
     }
 
-    protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
-    {
-        var s = base.MeasureOverride(widthConstraint, heightConstraint);
-        return s;
-    }
+    //protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
+    //{
+    //    var s = base.MeasureOverride(widthConstraint, heightConstraint);
+    //    return s;
+    //}
 
     //private PropertyInfo? _propertyInfo;
     //Size ICrossPlatformLayout.CrossPlatformMeasure(double widthConstraint, double heightConstraint)
@@ -393,32 +393,35 @@ public partial class VirtualizeListView : ScrollView//, ICrossPlatformLayout
     //    return content.DesiredSize;
     //}
 
-    //protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
-    //{
-    //    var horizontalPadding = Padding.HorizontalThickness + Margin.HorizontalThickness;
-    //    var verticalPadding = Padding.VerticalThickness + Margin.VerticalThickness;
+    protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
+    {
+        var padding = Padding;
+        var margin = Margin;
 
-    //    if (LayoutManager is not null)
-    //        LayoutManager.AvailableSpace = new(widthConstraint - horizontalPadding, heightConstraint - verticalPadding);
+        var horizontalPadding = padding.HorizontalThickness + margin.HorizontalThickness;
+        var verticalPadding = padding.VerticalThickness + margin.VerticalThickness;
 
-    //    var size = base.MeasureOverride(widthConstraint, heightConstraint);
+        if (LayoutManager is not null)
+            LayoutManager.AvailableSpace = new(widthConstraint - horizontalPadding, heightConstraint - verticalPadding);
 
-    //    var desiredWidth = widthConstraint;
-    //    if (HorizontalOptions != LayoutOptions.Fill)
-    //    {
-    //        desiredWidth = horizontalPadding
-    //            + (Content?.DesiredSize.Width ?? 0d);
-    //    }
+        var size = base.MeasureOverride(widthConstraint, heightConstraint);
 
-    //    var desiredHeight = heightConstraint;
-    //    if (VerticalOptions != LayoutOptions.Fill)
-    //    {
-    //        desiredHeight = verticalPadding
-    //            + (Content?.DesiredSize.Height ?? 0d);
-    //    }
+        var desiredWidth = widthConstraint;
+        if (HorizontalOptions != LayoutOptions.Fill)
+        {
+            desiredWidth = horizontalPadding
+                + (Content?.DesiredSize.Width ?? 0d);
+        }
 
-    //    return new(Math.Min(desiredWidth, widthConstraint), Math.Min(desiredHeight, heightConstraint));
-    //}
+        var desiredHeight = heightConstraint;
+        if (VerticalOptions != LayoutOptions.Fill)
+        {
+            desiredHeight = verticalPadding
+                + (Content?.DesiredSize.Height ?? 0d);
+        }
+
+        return new(Math.Min(desiredWidth, widthConstraint), Math.Min(desiredHeight, heightConstraint));
+    }
 
     protected virtual double ResolveConstraints(double externalConstraint, double explicitLength, double measuredLength, double min = 0d, double max = double.PositiveInfinity)
     {
