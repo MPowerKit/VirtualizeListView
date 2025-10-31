@@ -1,5 +1,4 @@
 ﻿using System.Collections;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
@@ -40,10 +39,6 @@ public partial class VirtualizeListView : ScrollView//, ICrossPlatformLayout
         if (propertyName == AdapterProperty.PropertyName)
         {
             OnAdapterChanging();
-        }
-        else if (propertyName == StickyHeadersProperty.PropertyName)
-        {
-            OnStickyHeadersChanging();
         }
     }
 
@@ -106,25 +101,6 @@ public partial class VirtualizeListView : ScrollView//, ICrossPlatformLayout
         {
             OnSizeChanged();
         }
-        else if (propertyName == StickyHeadersProperty.PropertyName)
-        {
-            OnStickyHeadersChanged();
-        }
-    }
-
-    protected virtual void OnStickyHeadersChanging()
-    {
-        if (!StickyHeaders) return;
-
-        var stickyHeaders = ItemDecorators.OfType<StickyHeaderItemDecorator>().FirstOrDefault();
-        ItemDecorators.Remove(stickyHeaders);
-    }
-
-    protected virtual void OnStickyHeadersChanged()
-    {
-        if (!StickyHeaders || ItemDecorators.Any(d => d is StickyHeaderItemDecorator)) return;
-
-        ItemDecorators.Add(new StickyHeaderItemDecorator());
     }
 
     protected virtual void OnHeaderChanged()
@@ -350,48 +326,17 @@ public partial class VirtualizeListView : ScrollView//, ICrossPlatformLayout
             || (Orientation == ScrollOrientation.Neither && PrevScrollOrientation == orientation);
     }
 
+    public virtual ScrollOrientation GetOrientation()
+    {
+        return Orientation is ScrollOrientation.Neither ? PrevScrollOrientation : Orientation;
+    }
+
     public virtual async Task ScrollToItem(object item, ScrollToPosition scrollToPosition, bool animated)
     {
         if (LayoutManager is null) return;
 
         await LayoutManager.ScrollToItem(item, scrollToPosition, animated);
     }
-
-    //protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
-    //{
-    //    var s = base.MeasureOverride(widthConstraint, heightConstraint);
-    //    return s;
-    //}
-
-    //private PropertyInfo? _propertyInfo;
-    //Size ICrossPlatformLayout.CrossPlatformMeasure(double widthConstraint, double heightConstraint)
-    //{
-    //    if ((this as IContentView)?.PresentedContent is not IView content)
-    //    {
-    //        _propertyInfo ??= typeof(ScrollView).GetProperty(nameof(ContentSize), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
-    //        _propertyInfo?.SetValue(this, Size.Zero);
-    //        return ContentSize;
-    //    }
-
-    //    switch (Orientation)
-    //    {
-    //        case ScrollOrientation.Horizontal:
-    //            widthConstraint = double.PositiveInfinity;
-    //            break;
-    //        case ScrollOrientation.Neither:
-    //        case ScrollOrientation.Both:
-    //            heightConstraint = double.PositiveInfinity;
-    //            widthConstraint = double.PositiveInfinity;
-    //            break;
-    //        case ScrollOrientation.Vertical:
-    //        default:
-    //            heightConstraint = double.PositiveInfinity;
-    //            break;
-    //    }
-
-    //    content.Measure(widthConstraint, heightConstraint);
-    //    return content.DesiredSize;
-    //}
 
     protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
     {
@@ -444,43 +389,6 @@ public partial class VirtualizeListView : ScrollView//, ICrossPlatformLayout
     {
         return !double.IsNaN(value);
     }
-
-    #region StickyHeaders
-    public bool StickyHeaders
-    {
-        get { return (bool)GetValue(StickyHeadersProperty); }
-        set { SetValue(StickyHeadersProperty, value); }
-    }
-
-    public static readonly BindableProperty StickyHeadersProperty =
-        BindableProperty.Create(
-            nameof(StickyHeaders),
-            typeof(bool),
-            typeof(VirtualizeListView));
-    #endregion
-
-    #region ItemDecorators
-    public ObservableCollection<ItemDecorator> ItemDecorators
-    {
-        get => (ObservableCollection<ItemDecorator>)GetValue(ItemDecoratorsProperty);
-    }
-
-    public static readonly BindableProperty ItemDecoratorsProperty =
-        BindableProperty.Create(
-            nameof(ItemDecorators),
-            typeof(ObservableCollection<ItemDecorator>),
-            typeof(VirtualizeListView),
-            defaultValueCreator: bindable =>
-            {
-                var listview = (bindable as VirtualizeListView)!;
-                var decorators = new ObservableCollection<ItemDecorator>();
-                if (listview.StickyHeaders)
-                {
-                    decorators.Add(new StickyHeaderItemDecorator());
-                }
-                return decorators;
-            });
-    #endregion
 
     #region Adapter
     public DataAdapter Adapter

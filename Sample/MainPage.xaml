@@ -36,11 +36,10 @@
                                           Margin="15"
                                           Padding="15"
                                           BackgroundColor="Brown"
-                                          HorizontalOptions="Start"
+                                          HorizontalOptions="Fill"
                                           IsGrouped="True"
                                           Orientation="Vertical"
-                                          StickyHeaders="False"
-                                          VerticalOptions="Start">
+                                          VerticalOptions="Fill">
                 <mpowerkit:VirtualizeListView.Resources>
                     <ResourceDictionary>
                         <Style TargetType="mpowerkit:LinearItemsLayoutManager">
