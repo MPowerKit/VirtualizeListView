@@ -2,7 +2,49 @@
 
 public class CellHolder : Grid
 {
-    public VirtualizeListViewItem? Item { get; set; }
+    public const double CachedItemsCoords = -10000000d;
+
+    private VirtualizeListViewItem? _item;
+
+    public void Cache()
+    {
+        this.TranslationX = CachedItemsCoords;
+        this.TranslationY = CachedItemsCoords;
+    }
+
+    public void GetFromCache()
+    {
+        this.TranslationX = 0d;
+        this.TranslationY = 0d;
+    }
+
+    public override string ToString()
+    {
+        return $"Item={Item}, {base.ToString()}";
+    }
+
+    public VirtualizeListViewItem? Item
+    {
+        get => _item;
+        set
+        {
+            _item = value;
+            if (value is null)
+            {
+                Cache();
+                return;
+            }
+
+            if (!value.AnyOpacityAnimation)
+            {
+                this.Opacity = 1d;
+            }
+            if (!value.AnyTranslationAnimation && !value.PreTranslationAnimation)
+            {
+                GetFromCache();
+            }
+        }
+    }
     //public bool IsCached => Item is null;
     //public bool WasArranged { get; protected set; }
     //public bool WasMeasured { get; protected set; }

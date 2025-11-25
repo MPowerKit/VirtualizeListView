@@ -199,7 +199,7 @@ public partial class VirtualizeListView : ScrollView//, ICrossPlatformLayout
 #endif
     }
 
-    protected virtual VirtualizeItemsLayoutManger? GetLayoutManger()
+    protected virtual VirtualizeItemsLayoutManager? GetLayoutManger()
     {
         if (ItemsLayout is LinearLayout linearLayout)
         {
@@ -210,17 +210,17 @@ public partial class VirtualizeListView : ScrollView//, ICrossPlatformLayout
                 BindingContext = null
             };
         }
-        //else if (ItemsLayout is GridLayout gridLayout)
-        //{
-        //    return new GridItemsLayoutManager()
-        //    {
-        //        VerticalItemSpacing = gridLayout.VerticalItemSpacing,
-        //        HorizontalItemsSpacing = gridLayout.HorizontalItemSpacing,
-        //        Span = gridLayout.Span,
-        //        CachePoolSize = gridLayout.InitialCachePoolSize,
-        //        BindingContext = null
-        //    };
-        //}
+        else if (ItemsLayout is GridLayout gridLayout)
+        {
+            return new GridItemsLayoutManager()
+            {
+                VerticalItemSpacing = gridLayout.VerticalItemSpacing,
+                HorizontalItemsSpacing = gridLayout.HorizontalItemSpacing,
+                Span = gridLayout.Span,
+                CachePoolSize = gridLayout.InitialCachePoolSize,
+                BindingContext = null
+            };
+        }
 
         return null;
     }
@@ -424,16 +424,16 @@ public partial class VirtualizeListView : ScrollView//, ICrossPlatformLayout
     #endregion
 
     #region LayoutManager
-    public VirtualizeItemsLayoutManger LayoutManager
+    public VirtualizeItemsLayoutManager LayoutManager
     {
-        get { return (VirtualizeItemsLayoutManger)GetValue(LayoutManagerProperty); }
+        get { return (VirtualizeItemsLayoutManager)GetValue(LayoutManagerProperty); }
         protected set { SetValue(LayoutManagerProperty, value); }
     }
 
     public static readonly BindableProperty LayoutManagerProperty =
         BindableProperty.Create(
             nameof(LayoutManager),
-            typeof(VirtualizeItemsLayoutManger),
+            typeof(VirtualizeItemsLayoutManager),
             typeof(VirtualizeListView),
             defaultValueCreator: bindable =>
             {

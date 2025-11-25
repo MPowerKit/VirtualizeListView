@@ -248,9 +248,14 @@ public class DataAdapter : IDisposable
         return InternalItems.ElementAtOrDefault(position) is HeaderItem or FooterItem;
     }
 
-    public virtual void OnBindCell(CellHolder holder, AdapterItem item, int position)
+    public virtual void BindCell(CellHolder holder, AdapterItem item, int position)
     {
         holder.BindingContext = item.Data;
+    }
+
+    public virtual void AttachCell(CellHolder holder, AdapterItem item, int position)
+    {
+        BindCell(holder, item, position);
         holder.Attached = true;
 
         if (holder.Children[0] is not VirtualizeListViewCell cell) return;
@@ -259,7 +264,15 @@ public class DataAdapter : IDisposable
         OnItemAppearing(item, position);
     }
 
-    public virtual void OnCellRecycled(CellHolder holder, AdapterItem item, int position)
+    public virtual void UnbindCell(CellHolder holder, AdapterItem item, int position)
+    {
+        // commented out for better perfomance
+        // theoretically bindingcontext should be nullified
+        // but practically performance getting worse if uncommented
+        //holder.BindingContext = null;
+    }
+
+    public virtual void DetachCell(CellHolder holder, AdapterItem item, int position)
     {
         var content = holder.Children[0];
 
@@ -272,10 +285,7 @@ public class DataAdapter : IDisposable
         }
         finally
         {
-            // commented out for better perfomance
-            // theoretically bindingcontext should be nullified
-            // but practically performance getting worse if uncommented
-            //holder.BindingContext = null;
+            UnbindCell(holder, item, position);
             holder.Attached = false;
         }
     }

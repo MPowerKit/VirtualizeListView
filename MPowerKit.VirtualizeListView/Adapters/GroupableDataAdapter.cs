@@ -181,7 +181,8 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
     protected override void RemoveListenerCollection(IEnumerable? itemsSource)
     {
-        if (!ListView.IsGrouped || itemsSource is null)
+        if (!ListView.IsGrouped || itemsSource is null
+            || (ListView.IsGrouped && itemsSource is not IEnumerable<IEnumerable>))
         {
             base.RemoveListenerCollection(itemsSource);
             return;
@@ -199,7 +200,8 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
 
     public override void InitCollection(IEnumerable? itemsSource)
     {
-        if (!ListView.IsGrouped || itemsSource is null)
+        if (!ListView.IsGrouped || itemsSource is null
+            || (ListView.IsGrouped && itemsSource is not IEnumerable<IEnumerable>))
         {
             base.InitCollection(itemsSource);
             return;

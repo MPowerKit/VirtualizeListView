@@ -15,6 +15,8 @@ public class ItemsGroup : ObservableRangeCollection<Item>
 
 public partial class Item : ObservableObject
 {
+    private static string _typeName = typeof(Item).FullName!;
+
     [ObservableProperty]
     private int _id;
     [ObservableProperty]
@@ -25,6 +27,11 @@ public partial class Item : ObservableObject
     private string _description;
     [ObservableProperty]
     private double _height;
+
+    public override string ToString()
+    {
+        return $"{_typeName}: Id={Id}";
+    }
 }
 
 public class ItemTemplateSelector : DataTemplateSelector
@@ -70,7 +77,7 @@ public partial class MainPage
             });
         }
 
-        listView.ItemsSource = new ObservableRangeCollection<ItemsGroup>(items.GroupBy(i => (int)(i.Id / 10.0)).Select(g => new ItemsGroup(g, g.Key)));
+        listView.ItemsSource = items;//new ObservableRangeCollection<ItemsGroup>(items.GroupBy(i => (int)(i.Id / 10.0)).Select(g => new ItemsGroup(g, g.Key)));
     }
 
     private async void FixedRefreshView_Refreshing(object sender, EventArgs e)
@@ -87,7 +94,7 @@ public partial class MainPage
         var source = listView.ItemsSource as ObservableRangeCollection<Item>;
 
         ObservableRangeCollection<Item> list = [];
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 1; i++)
         {
             list.Add(new Item()
             {
@@ -99,7 +106,7 @@ public partial class MainPage
             });
         }
 
-        source.InsertRange(0, list);
+        source.InsertRange(1, list);
     }
 
     private void Button_Clicked_Remove(object sender, EventArgs e)

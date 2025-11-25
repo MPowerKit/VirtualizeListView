@@ -4,15 +4,20 @@ using Microsoft.Maui.Controls.Internals;
 using Microsoft.Maui.Layouts;
 
 using static MPowerKit.VirtualizeListView.DataAdapter;
+using static MPowerKit.VirtualizeListView.VirtualizeListViewItem;
 
 namespace MPowerKit.VirtualizeListView;
 
-public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDisposable
+public abstract class VirtualizeItemsLayoutManager : Layout, ILayoutManager, IDisposable
 {
     protected const double AutoSize = -1d;
-    protected const double CachedItemsCoords = -1000000d;
     protected static double EstimatedItemSize { get; set; } = 200d;
     protected const int VisibleItemsCapacity = 50;
+
+    public TimeSpan OpacityAnimationDuration { get; set; } = TimeSpan.FromMilliseconds(1500);
+    public TimeSpan ShiftAnimationDuration { get; set; } = TimeSpan.FromMilliseconds(1500);
+    public TimeSpan ZeroAnimationDelay { get; set; } = TimeSpan.FromMilliseconds(0);
+    public TimeSpan DefaultAnimationDelay { get; set; } = TimeSpan.FromMilliseconds(750);
 
     protected ScrollEventArgs PrevScroll { get; set; } = new(0d, 0d, 0d, 0d);
     protected Point PrevScrollBeforeSizeChange { get; set; }
@@ -28,7 +33,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     public IReadOnlyList<VirtualizeListViewItem> ReadOnlyLaidOutItems => LaidOutItems.AsReadOnly();
 
-    protected Dictionary<int, Queue<CellHolder>> CachedCells { get; } = [];
+    protected Dictionary<int, Stack<CellHolder>> CachedCells { get; } = [];
 
     public virtual HashSet<VirtualizeListViewItem> VisibleItems { get; protected set; } = new HashSet<VirtualizeListViewItem>(VisibleItemsCapacity);
 
@@ -41,7 +46,19 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     protected virtual LayoutOptions ListViewHorizontalOptions => ListView?.HorizontalOptions ?? LayoutOptions.Fill;
     protected virtual LayoutOptions ListViewVerticalOptions => ListView?.VerticalOptions ?? LayoutOptions.Fill;
 
-    public Rect Viewport { get; protected set; }
+    public virtual Rect Viewport
+    {
+        get
+        {
+            if (ListView is not { } listView) return new();
+
+            var padding = listView.Padding;
+            var availableSpace = AvailableSpace;
+            Size listViewBounds = new(availableSpace.Width + padding.HorizontalThickness, availableSpace.Height + padding.VerticalThickness);
+            return new(listView.ScrollX - padding.Left, listView.ScrollY - padding.Top, listViewBounds.Width, listViewBounds.Height);
+        }
+    }//{ get; protected set; }
+
     protected bool NeedsAdjustScroll { get; set; }
 
     protected override ILayoutManager CreateLayoutManager() => this;
@@ -121,12 +138,6 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     {
         if (ListView is null) return;
 
-        var listView = ListView;
-        var padding = listView.Padding;
-        var availableSpace = listView.Bounds.Size;
-
-        Viewport = new(e.ScrollX - padding.Left, e.ScrollY - padding.Top, availableSpace.Width, availableSpace.Height);
-
         var newScroll = e - PrevScroll;
         UpdateItemsLayout(0, true);
         PrevScroll = newScroll;
@@ -157,7 +168,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
     }
 
     /// <summary>
-    /// Use only if there was no any items before, or itemtemplate has changed.
+    /// Use only if there was no any items before, or item template has changed.
     /// Clears all items and lays out new ones.
     /// </summary>
     public virtual void InvalidateLayout()
@@ -167,6 +178,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         if (!DoesListViewHaveSize() || Adapter?.ItemsCount is null or 0) return;
 
         var count = Adapter.ItemsCount;
+        var viewport = Viewport;
 
         for (int i = 0; i < count; i++)
         {
@@ -176,12 +188,12 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
             ShiftItemsChunk(LaidOutItems, i, LaidOutItems.Count);
 
-            if (!item.IsOnScreen) continue;
+            if (!IsOnScreen(item, viewport)) continue;
 
-            ReuseCell(item);
+            AttachCell(item, viewport);
         }
 
-        (this as IView)!.InvalidateMeasure();
+        (this.Parent as IView)!.InvalidateMeasure();
 
         this.Dispatcher.Dispatch(() =>
         {
@@ -274,44 +286,155 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         var finishIndex = startingIndex + e.TotalCount;
 
-        var itemsToRearrange = LaidOutItems.Where(i => i.IsOnScreen && i.IsAttached);
+        var itemsToRearrange = VisibleItems.OrderBy(i => i.Position).ToList();
         var firstVisibleItem = itemsToRearrange.FirstOrDefault();
+        var lastVisibleItem = itemsToRearrange.LastOrDefault();
         var prevVisibleCellBounds = firstVisibleItem?.Bounds ?? new();
 
+        List<VirtualizeListViewItem> newItems = [];
         for (int index = startingIndex; index < finishIndex; index++)
         {
             var item = CreateItemForPosition(index);
 
             LaidOutItems.Insert(index, item);
+            newItems.Add(item);
         }
 
-        RepositionItemsFromIndex(LaidOutItems, finishIndex);
+        var laidOutItems = LaidOutItems;
+        count = laidOutItems.Count;
 
-        ShiftItemsConsecutively(LaidOutItems, startingIndex, finishIndex);
-
-        if (startingIndex == 0)
+        // we inserted items after the visible items
+        // so just reposition and return
+        if (startingIndex > lastVisibleItem?.Position)
         {
-            ShiftItemsConsecutively(LaidOutItems, finishIndex, LaidOutItems.Count);
+            RepositionItemsFromIndex(laidOutItems, startingIndex);
+            ShiftItemsConsecutively(laidOutItems, startingIndex, count);
+            return;
         }
-        else ShiftItemsChunk(LaidOutItems, finishIndex, LaidOutItems.Count);
 
-        UpdateItemsLayout(startingIndex);
-
-        // if we inserted items defore the first visible item
+        // if we inserted items before the first visible item
         // then we need to adjust the scroll position
-        if (firstVisibleItem is not null && firstVisibleItem.Position >= finishIndex)
+        if (firstVisibleItem?.Position >= startingIndex)
         {
-            AdjustScrollIfNeeded(LaidOutItems, firstVisibleItem, prevVisibleCellBounds);
+            RepositionItemsFromIndex(laidOutItems, finishIndex);
+            ShiftItemsConsecutively(laidOutItems, startingIndex, count);
+
+            AdjustScrollIfNeeded(laidOutItems, firstVisibleItem, prevVisibleCellBounds);
+
+            (this as IView)!.InvalidateMeasure();
+            return;
         }
+
+        //fade in new items if they are visible
+        if (startingIndex >= (firstVisibleItem?.Position ?? 0)
+            && startingIndex <= (lastVisibleItem?.Position ?? 0))
+        {
+            foreach (var item in newItems)
+            {
+                item.AddFadeInAnimation(OpacityAnimationDuration, DefaultAnimationDelay);
+                item.AnimateAll();
+            }
+        }
+
+        var itemsBeforeInsertedRange = itemsToRearrange.Where(i => i.Position < startingIndex)
+            .Select(i => (i, i.Bounds)).ToList();
+        var itemsAfterInsertedRange = itemsToRearrange.Where(i => i.Position >= startingIndex)
+            .Select(i => (i, i.Bounds)).ToList();
+
+        RepositionItemsFromIndex(laidOutItems, finishIndex);
+        ShiftItemsConsecutively(laidOutItems, startingIndex, count);
+
+        OnInsertedIntoVisibleRect(itemsAfterInsertedRange, newItems);
     }
 
+    protected virtual void OnInsertedIntoVisibleRect(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift,
+        List<VirtualizeListViewItem> insertedItems)
+    {
+        var orientation = GetOrientation();
+        if (orientation is ScrollOrientation.Both) return;
+
+        var listView = ListView!;
+        var padding = listView.Padding;
+
+        foreach (var (item, prevBounds) in itemsToShift)
+        {
+            item.AddTranslationYAnimation(prevBounds.Y, ShiftAnimationDuration, ZeroAnimationDelay);
+            item.AddTranslationXAnimation(prevBounds.X, ShiftAnimationDuration, ZeroAnimationDelay);
+        }
+
+        PrepareItemsForPreTranslationAnimation(insertedItems);
+
+        (this as IView)!.InvalidateMeasure();
+
+        this.Dispatcher.Dispatch(() =>
+        {
+            var viewport = Viewport;
+
+            CleanupItemsPreTranslationAnimation(insertedItems);
+            foreach (var item in insertedItems.Where(i => IsOnScreen(i, viewport)))
+            {
+                if (item.Cell is CellHolder cell)
+                {
+                    cell.GetFromCache();
+                }
+            }
+
+            foreach (var item in insertedItems.Where(i => IsOnScreen(i, viewport)))
+            {
+                item.AddFadeInAnimation(OpacityAnimationDuration, DefaultAnimationDelay);
+                item.AnimateAll();
+            }
+
+            if (itemsToShift.Any(i => IsOnScreen(i.item, viewport)))
+            {
+                foreach (var (item, prevBounds) in itemsToShift)
+                {
+                    Action<VirtualizeListViewItem> callback = !IsOnScreen(item, viewport)
+                        ? itemToCache => DetachCell(itemToCache)
+                        : itemToCache => { };
+
+                    item.AnimateAll(() => callback(item));
+                }
+                return;
+            }
+
+            if (orientation is ScrollOrientation.Vertical)
+            {
+                var yOffset = viewport.Bottom - itemsToShift[0].prevBounds.Y;
+
+                foreach (var (item, prevBounds) in itemsToShift)
+                {
+                    Task.WhenAll(
+                        item.Animate<TranslationYAnimation>(prevBounds.Y + yOffset),
+                        item.Animate<TranslationXAnimation>(prevBounds.X)
+                    ).ContinueWith(_ => DetachCell(item));
+                }
+            }
+            else
+            {
+                var xOffset = viewport.Right - itemsToShift[0].prevBounds.X;
+                foreach (var (item, prevBounds) in itemsToShift)
+                {
+                    Task.WhenAll(
+                        item.Animate<TranslationXAnimation>(prevBounds.X + xOffset),
+                        item.Animate<TranslationYAnimation>(prevBounds.Y)
+                    ).ContinueWith(_ => DetachCell(item));
+                }
+            }
+        });
+    }
+
+    // this method is a total mess thanks to the animations
+    // haven't found better solution for now
     protected virtual void AdapterItemRangeRemoved(object? sender, (int StartingIndex, int TotalCount) e)
     {
         if (!DoesListViewHaveSize()) return;
 
-        var count = LaidOutItems.Count;
+        var laidOutItems = LaidOutItems;
+        var count = laidOutItems.Count;
         var startingIndex = e.StartingIndex;
         var finishIndex = startingIndex + e.TotalCount;
+        var prevViewport = Viewport;
 
         if (count == 0 || finishIndex > count || startingIndex < 0)
         {
@@ -320,67 +443,124 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         var itemsToRemove = LaidOutItems[startingIndex..finishIndex];
         LaidOutItems.RemoveRange(startingIndex, e.TotalCount);
+        laidOutItems = [.. LaidOutItems];
+
+        var visibleItems = VisibleItems.Except(itemsToRemove).OrderBy(i => i.Position).ToList();
+        var firstVisibleItem = visibleItems.FirstOrDefault();
+        var firstItemPrevVisibleCellBounds = firstVisibleItem?.Bounds ?? new();
+
+        // we removed items after the visible items
+        // so just reposition and return
+        if (laidOutItems.Count > 0
+            && !IsOnScreen(itemsToRemove[0], prevViewport) && startingIndex > firstVisibleItem?.Position)
+        {
+            RepositionItemsFromIndex(laidOutItems, startingIndex);
+            ShiftItemsConsecutively(laidOutItems, startingIndex, laidOutItems.Count);
+            return;
+        }
 
         for (int i = 0; i < e.TotalCount; i++)
         {
-            DetachCell(itemsToRemove[i]);
+            var item = itemsToRemove[i];
+            if (!IsOnScreen(item, prevViewport)) continue;
+
+            VisibleItems.Remove(item);
+            item.AddFadeOutAnimation(OpacityAnimationDuration, ZeroAnimationDelay);
+            item.AnimateAll(() => DetachCell(item));
         }
 
+        // no items left, nothing to animate
         if (LaidOutItems.Count == 0)
         {
-            (this as IView).InvalidateMeasure();
+            (this as IView)!.InvalidateMeasure();
             return;
         }
 
-        var itemsToRearrange = LaidOutItems.Where(i => i.IsOnScreen && i.IsAttached);
-        var firstVisibleItem = itemsToRearrange.FirstOrDefault();
-        var prevVisibleCellBounds = firstVisibleItem?.Bounds ?? new();
+        var itemsToAnimateBeforeRemovedRange =
+            laidOutItems.Take(startingIndex).Select(i => (i, i.Bounds)).ToList();
+        var itemsToAnimateAfterRemovedRange =
+            laidOutItems.Skip(startingIndex).Select(i => (i, i.Bounds)).ToList();
 
-        RepositionItemsFromIndex(LaidOutItems, startingIndex);
+        RepositionItemsFromIndex(laidOutItems, startingIndex);
+        ShiftItemsConsecutively(laidOutItems, startingIndex, laidOutItems.Count);
 
-        if (startingIndex == 0)
+        // we removed items before the first visible item
+        // so we need just to adjust scroll position and redraw
+        if (!IsOnScreen(itemsToRemove[^1], prevViewport) && firstVisibleItem?.Position >= startingIndex)
         {
-            ShiftItemsConsecutively(LaidOutItems, startingIndex, LaidOutItems.Count);
+            AdjustScrollIfNeeded(laidOutItems, firstVisibleItem!, firstItemPrevVisibleCellBounds);
+            (this as IView)!.InvalidateMeasure();
+            return;
         }
-        else ShiftItemsChunk(LaidOutItems, startingIndex, LaidOutItems.Count);
 
         var listView = ListView!;
-        var scrollX = listView.ScrollX;
-        var scrollY = listView.ScrollY;
+        var prevScrollX = listView.ScrollX;
+        var prevScrollY = listView.ScrollY;
+        var padding = listView.Padding;
 
-        // if we removed items from the beginning
-        // and if we are at the top we dont need to adjust the scroll position
-        if (startingIndex == 0 && scrollY == 0d && scrollY == 0d)
+        bool scrollWasAdjusted = false;
+
+        try
         {
-            UpdateItemsLayout(startingIndex);
-            return;
+            // if we removed items from the beginning
+            // we need animate items below
+            if (startingIndex == 0 && prevScrollY == 0d && prevScrollX == 0d)
+            {
+                return;
+            }
+
+            // if we removed all visible items
+            // then we need to adjust the scroll position
+            // and animate items from the bottom
+            if (firstVisibleItem is null)
+            {
+                var itemBeforeRemoved = laidOutItems[startingIndex - 1];
+
+                scrollWasAdjusted = AdjustScrollIfNeeded(laidOutItems, itemBeforeRemoved, new(prevScrollX - padding.Left, prevScrollY - padding.Top, 0, 0));
+                return;
+            }
+
+            // if we removed items before the first visible item
+            // then we also need to adjust the scroll position
+            if (firstVisibleItem.Position >= startingIndex)
+            {
+                scrollWasAdjusted = AdjustScrollIfNeeded(laidOutItems, firstVisibleItem, firstItemPrevVisibleCellBounds);
+            }
         }
-
-        // if we removed all visible items
-        // then we need to adjust the scroll position
-        if (firstVisibleItem is null)
+        finally
         {
-            var prevItem = LaidOutItems[startingIndex - 1];
+            var scrollX = listView.ScrollX;
+            var scrollY = listView.ScrollY;
+            var scrollDeltaX = scrollX - prevScrollX;
+            var scrollDeltaY = scrollY - prevScrollY;
 
-            UpdateItemsLayout(startingIndex);
-            var padding = listView.Padding;
-            AdjustScrollIfNeeded(LaidOutItems, prevItem, new(scrollX - padding.Left, scrollY - padding.Top, 0, 0));
-            return;
-        }
+            bool hasVisibleItemsBefore = firstVisibleItem?.Position < startingIndex;
+            bool hasVisibleItemsAfter = visibleItems.Any(i => i.Position >= startingIndex);
 
-        // if we removed items after the first visible item
-        // so we dont need to adjust the scroll position
-        if (firstVisibleItem.Position < startingIndex)
-        {
-            UpdateItemsLayout(startingIndex);
-            return;
-        }
-
-        // if we removed items before the first visible item
-        // then we also need to adjust the scroll position
-        if (firstVisibleItem.Position >= startingIndex)
-        {
-            AdjustScrollIfNeeded(LaidOutItems, firstVisibleItem, prevVisibleCellBounds);
+            // we need to animate items before removed range
+            // from the top of the viewport
+            if (!hasVisibleItemsBefore && hasVisibleItemsAfter && scrollWasAdjusted)
+            {
+                OnRemovedLeadingVisibleItems(
+                    [.. itemsToAnimateBeforeRemovedRange, .. itemsToAnimateAfterRemovedRange], itemsToRemove, prevViewport, scrollDeltaX, scrollDeltaY);
+            }
+            // we need to animate already visible items
+            // to avoid the blink effect after the rendering cycle
+            else if (hasVisibleItemsBefore && hasVisibleItemsAfter && !scrollWasAdjusted)
+            {
+                OnRemovedMiddleVisibleItems(itemsToAnimateAfterRemovedRange, itemsToRemove, prevViewport, scrollDeltaX, scrollDeltaY);
+            }
+            // we have removed all visible range
+            // thus we need to animate items from the bottom
+            else if (!hasVisibleItemsBefore && !hasVisibleItemsAfter && scrollWasAdjusted)
+            {
+                OnRemovedAllVisibleItems(itemsToAnimateAfterRemovedRange, itemsToRemove, prevViewport, scrollDeltaX, scrollDeltaY);
+            }
+            // we need to animate items from the bottom
+            else if (hasVisibleItemsBefore && !hasVisibleItemsAfter)
+            {
+                OnRemovedTrailingVisibleItems(itemsToAnimateAfterRemovedRange, itemsToRemove, prevViewport, scrollDeltaX, scrollDeltaY);
+            }
         }
     }
 
@@ -412,7 +592,9 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
             DetachCell(itemToRemove);
         }
 
-        var itemsToRearrange = LaidOutItems.Where(i => i.IsOnScreen && i.IsAttached);
+        var prevViewPort = Viewport;
+
+        var itemsToRearrange = LaidOutItems.Where(i => IsOnScreen(i, prevViewPort) && i.IsAttached);
         var firstVisibleItem = itemsToRearrange.FirstOrDefault();
         var prevVisibleCellBounds = firstVisibleItem?.Bounds ?? new();
 
@@ -431,7 +613,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         var listView = ListView!;
 
         // if we replaced items from the beginning
-        // and if we are at the top we dont need to adjust the scroll position
+        // and if we are at the top we don't need to adjust the scroll position
         if (startingIndex == 0 && listView.ScrollX == 0d && listView.ScrollY == 0d)
         {
             UpdateItemsLayout(startingIndex);
@@ -440,7 +622,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         // if there is no any visible item 
         // or we replaced items after the first visible item
-        // so we dont need to adjust the scroll position
+        // so we don't need to adjust the scroll position
         if (firstVisibleItem is null || firstVisibleItem.Position < startingIndex)
         {
             UpdateItemsLayout(startingIndex);
@@ -473,7 +655,9 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         var start = Math.Min(oldIndex, newIndex);
         var end = Math.Max(oldIndex, newIndex);
 
-        var itemsToRearrange = LaidOutItems.FindAll(i => i.IsOnScreen && i.IsAttached);
+        var prevViewPort = Viewport;
+
+        var itemsToRearrange = LaidOutItems.FindAll(i => IsOnScreen(i, prevViewPort) && i.IsAttached);
         var firstVisibleItem = itemsToRearrange.First();
         var lastVisibleItem = itemsToRearrange.Last();
         var prevVisibleCellBounds = firstVisibleItem.Bounds;
@@ -523,17 +707,18 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
     protected virtual void UpdateItemsLayout(int fromPosition, bool shouldAdjustScroll = false)
     {
-        var laidOutItmes = LaidOutItems;
-        var count = laidOutItmes.Count;
+        var laidOutItems = LaidOutItems;
+        var count = laidOutItems.Count;
         if (count == 0) return;
 
         NeedsAdjustScroll = shouldAdjustScroll;
+        var viewport = Viewport;
 
         for (int i = fromPosition; i < count; i++)
         {
-            var item = laidOutItmes[i];
+            var item = laidOutItems[i];
 
-            if (!item.IsOnScreen && item.IsAttached)
+            if (!IsOnScreen(item, viewport) && item.IsAttached)
             {
                 (this as IView)!.InvalidateMeasure();
                 return;
@@ -542,9 +727,9 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         for (int i = fromPosition; i < count; i++)
         {
-            var item = laidOutItmes[i];
+            var item = laidOutItems[i];
 
-            if (item.IsOnScreen && !item.IsAttached)
+            if (IsOnScreen(item, viewport) && !item.IsAttached)
             {
                 (this as IView)!.InvalidateMeasure();
                 return;
@@ -554,26 +739,13 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         NeedsAdjustScroll = false;
     }
 
-    protected virtual void CacheItems(int fromPosition)
-    {
-        var items = LaidOutItems;
-        var count = items.Count;
-
-        for (int i = fromPosition; i < count; i++)
-        {
-            var item = items[i];
-
-            if (!item.IsOnScreen) DetachCell(item);
-        }
-    }
-
     protected virtual void DetachCell(VirtualizeListViewItem item)
     {
         if (!item.IsAttached || item.Cell is null) return;
 
         VisibleItems.Remove(item);
 
-        Adapter!.OnCellRecycled(item.Cell!, item.AdapterItem!, item.Position);
+        Adapter!.DetachCell(item.Cell!, item.AdapterItem!, item.Position);
 
         CacheCell(item);
     }
@@ -584,54 +756,57 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
 
         var cell = item.Cell;
 
-        cell.TranslationX = CachedItemsCoords;
-        cell.TranslationY = CachedItemsCoords;
-
         var templateId = (item.Template as IDataTemplateController)!.Id;
-        if (!CachedCells.TryGetValue(templateId, out var queue))
+        if (!CachedCells.TryGetValue(templateId, out var stack))
         {
-            queue = new Queue<CellHolder>();
-            CachedCells[templateId] = queue;
+            stack = new Stack<CellHolder>();
+            CachedCells[templateId] = stack;
         }
 
-        queue.Enqueue(cell);
+        stack.Push(cell);
         item.Cell = null;
     }
 
-    protected virtual void ReuseCell(VirtualizeListViewItem item)
+    protected virtual void AttachCell(VirtualizeListViewItem item, Rect viewport)
     {
         VisibleItems.Add(item);
         if (item.Cell is not null) return;
 
+        Adapter!.AttachCell(ReuseCell(item, viewport), item.AdapterItem!, item.Position);
+    }
+
+    protected virtual CellHolder ReuseCell(VirtualizeListViewItem item, Rect viewport)
+    {
+        CellHolder cell;
+
         var templateId = (item.Template as IDataTemplateController)!.Id;
-        if (CachedCells.TryGetValue(templateId, out var queue) && queue.Count > 0)
+        if (CachedCells.TryGetValue(templateId, out var stack) && stack.Count > 0)
         {
-            var cell = queue.Dequeue();
+            cell = stack.Pop();
 
             item.Cell = cell;
-
-            cell.TranslationX = 0d;
-            cell.TranslationY = 0d;
         }
         else
         {
-            var freeItem = LaidOutItems.FirstOrDefault(i => (i.Template as IDataTemplateController)!.Id == templateId
-                                                        && !i.IsAttached && !i.IsOnScreen && i.Cell is not null);
+            var freeItem = LaidOutItems.FirstOrDefault(i => i.Cell is not null
+                && (i.Template as IDataTemplateController)!.Id == templateId
+                && !i.IsAttached && !i.IntersectsWithRect(viewport));
             if (freeItem is not null)
             {
-                var cell = freeItem.Cell;
+                cell = freeItem.Cell!;
                 freeItem.Cell = null;
                 item.Cell = cell;
             }
             else
             {
-                item.Cell = Adapter!.OnCreateCell(item.Template!, item.Position);
+                cell = Adapter!.OnCreateCell(item.Template!, item.Position);
+                item.Cell = cell;
 
-                this.Add(item.Cell);
+                this.Add(cell);
             }
         }
 
-        Adapter!.OnBindCell(item.Cell!, item.AdapterItem!, item.Position);
+        return cell;
     }
 
     protected virtual VirtualizeListViewItem CreateDummyItem(DataTemplate template, CellHolder cell)
@@ -763,14 +938,104 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         }
     }
 
+    protected virtual bool BeforeItemMeasure(VirtualizeListViewItem item, Rect viewport)
+    {
+        if (!IsOnScreen(item, viewport))
+        {
+            if (!item.AnyPendingAnimation
+                && !item.AnyAnimatingAnimation)
+            {
+                DetachCell(item);
+            }
+
+            return false;
+        }
+
+        if (item.Cell is null) AttachCell(item, viewport);
+        return true;
+    }
+
     protected abstract void RepositionItemsFromIndex(IReadOnlyList<VirtualizeListViewItem> items, int index);
     public abstract VirtualizeListViewItem CreateItemForPosition(int position);
     protected abstract Thickness GetItemMargin(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item);
     protected abstract Size GetEstimatedItemSize(VirtualizeListViewItem item, Size availableSize);
     protected abstract void ShiftItemsChunk(IReadOnlyList<VirtualizeListViewItem> items, int start, int exclusiveEnd);
     protected abstract void ShiftItemsConsecutively(IReadOnlyList<VirtualizeListViewItem> items, int start, int exclusiveEnd);
-    protected abstract Point GetOffsetToAdjustScroll(VirtualizeListViewItem item, Rect prevBoundsOfItem);
     protected abstract bool AdjustScrollIfNeeded(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Rect prevBoundsOfItem);
+
+    #region Items Animation
+    protected abstract void OnRemovedLeadingVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift,
+        List<VirtualizeListViewItem> removedItems,
+        Rect prevViewport, double scrollDeltaX, double scrollDeltaY);
+
+    protected abstract void OnRemovedMiddleVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift,
+        List<VirtualizeListViewItem> removedItems,
+        Rect prevViewport, double scrollDeltaX, double scrollDeltaY);
+
+    protected abstract void OnRemovedAllVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift,
+        List<VirtualizeListViewItem> removedItems,
+        Rect prevViewport, double scrollDeltaX, double scrollDeltaY);
+
+    protected abstract void OnRemovedTrailingVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift,
+        List<VirtualizeListViewItem> removedItems,
+        Rect prevViewport, double scrollDeltaX, double scrollDeltaY);
+    #endregion
+
+    protected virtual bool IsOnScreen(VirtualizeListViewItem item, Rect viewport)
+    {
+        return item.IntersectsWithRect(viewport);
+    }
+
+    #region Animation
+    protected virtual void ApplyScrollDeltaToRemovedItems(List<VirtualizeListViewItem> itemsToApplyDelta,
+        Rect viewport, double scrollDeltaX, double scrollDeltaY)
+    {
+        var visibleRemovedItems = itemsToApplyDelta.Where(i => i.Bounds.IntersectsWith(viewport)).ToList();
+        foreach (var item in visibleRemovedItems)
+        {
+            if (item.Cell is CellHolder holder)
+            {
+                holder.TranslationX = scrollDeltaX;
+                holder.TranslationY = scrollDeltaY;
+            }
+        }
+    }
+
+    protected virtual void CleanupItemsPreTranslationAnimation(List<VirtualizeListViewItem> itemsToCleanup)
+    {
+        foreach (var item in itemsToCleanup)
+        {
+            item.OnCellAttached -= Item_OnCellAttached_CacheCell;
+            item.PreTranslationAnimation = false;
+        }
+    }
+
+    protected virtual void Item_OnCellAttached_CacheCell(object? sender, CellHolder? e)
+    {
+        var item = (sender as VirtualizeListViewItem)!;
+        item.OnCellAttached -= Item_OnCellAttached_CacheCell;
+        e?.Cache();
+    }
+
+    protected virtual void PrepareItemsForPreTranslationAnimation(List<VirtualizeListViewItem> itemsToAnimate)
+    {
+        foreach (var item in itemsToAnimate)
+        {
+            // we need to move offscreen invisible items
+            // which are about to appear
+            // to avoid the blink effect after the rendering cycle
+            item.OnCellAttached += Item_OnCellAttached_CacheCell;
+
+            item.PreTranslationAnimation = true;
+
+            if (item.Cell is not CellHolder holder) continue;
+
+            // here we need to move item off-screen
+            // to avoid the blink effect after the rendering cycle
+            holder.Cache();
+        }
+    }
+    #endregion
 
     #region ILayoutManager
     Size ILayoutManager.Measure(double widthConstraint, double heightConstraint)
@@ -808,7 +1073,7 @@ public abstract class VirtualizeItemsLayoutManger : Layout, ILayoutManager, IDis
         GC.SuppressFinalize(this);
     }
 
-    ~VirtualizeItemsLayoutManger()
+    ~VirtualizeItemsLayoutManager()
     {
         Dispose(false);
     }
