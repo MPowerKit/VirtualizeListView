@@ -27,9 +27,9 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
         return IsOneOf(ListView.GroupFooterTemplate, template, position);
     }
 
-    public override bool IsSuplementary(int position)
+    public override bool IsSupplementary(int position)
     {
-        return base.IsSuplementary(position)
+        return base.IsSupplementary(position)
             || InternalItems.ElementAtOrDefault(position) is GroupHeaderItem or GroupHeaderItem;
     }
 
@@ -343,7 +343,7 @@ public class GroupableDataAdapter(VirtualizeListView listView) : DataAdapter(lis
         }
         else
         {
-            foreach (var item in group)
+            foreach (var _ in group)
             {
                 InternalItems.Move(realOldIndex, realNewIndex);
                 NotifyItemMoved(realOldIndex, realNewIndex);

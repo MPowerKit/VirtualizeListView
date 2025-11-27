@@ -243,7 +243,7 @@ public class DataAdapter : IDisposable
         return IsOneOf(ListView.FooterTemplate, template, position);
     }
 
-    public virtual bool IsSuplementary(int position)
+    public virtual bool IsSupplementary(int position)
     {
         return InternalItems.ElementAtOrDefault(position) is HeaderItem or FooterItem;
     }
@@ -266,8 +266,8 @@ public class DataAdapter : IDisposable
 
     public virtual void UnbindCell(CellHolder holder, AdapterItem item, int position)
     {
-        // commented out for better perfomance
-        // theoretically bindingcontext should be nullified
+        // commented out for better performance
+        // theoretically binding context should be nullified
         // but practically performance getting worse if uncommented
         //holder.BindingContext = null;
     }

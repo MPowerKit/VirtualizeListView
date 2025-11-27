@@ -30,8 +30,15 @@
         <!--<CollectionView x:Name="listView"
                         Grid.Row="2">
             <CollectionView.ItemsLayout>
-                <LinearItemsLayout ItemSpacing="15"
-                                   Orientation="Vertical" />
+        -->
+        <!--<LinearItemsLayout ItemSpacing="15"
+                                   Orientation="Vertical" />-->
+        <!--
+
+                <GridItemsLayout HorizontalItemSpacing="15"
+                                 Orientation="Vertical"
+                                 Span="3"
+                                 VerticalItemSpacing="15" />
             </CollectionView.ItemsLayout>
             <CollectionView.ItemTemplate>
                 <local:ItemTemplateSelector>
@@ -129,13 +136,13 @@
                 </ResourceDictionary>
             </mpowerkit:VirtualizeListView.Resources>
             <mpowerkit:VirtualizeListView.ItemsLayout>
-                <mpowerkit:LinearLayout InitialCachePoolSize="0"
-                                        ItemSpacing="15" />
+                <!--<mpowerkit:LinearLayout InitialCachePoolSize="2"
+                                        ItemSpacing="15" />-->
 
-                <!--<mpowerkit:GridLayout HorizontalItemSpacing="15"
+                <mpowerkit:GridLayout HorizontalItemSpacing="15"
                                       InitialCachePoolSize="0"
                                       Span="3"
-                                      VerticalItemSpacing="15" />-->
+                                      VerticalItemSpacing="15" />
 
             </mpowerkit:VirtualizeListView.ItemsLayout>
 

@@ -220,15 +220,17 @@ public partial class LinearItemsLayoutManager : VirtualizeItemsLayoutManager
         return dx == 0d || (left < (scrollX + listView.Width) && left > scrollX) ? 0d : dx;
     }
 
-    protected virtual Size MeasureItem(VirtualizeListViewItem item, Rect viewport, double availableWidth, double availableHeight)
+    protected override Size MeasureItem(VirtualizeListViewItem item, Rect viewport, Size availableSpace)
     {
         var adapter = Adapter!;
 
         var cell = ReuseCell(item, viewport);
         adapter.BindCell(cell, item.AdapterItem!, item.Position);
 
-        var iview = cell as IView;
-        var measure = iview!.Measure(availableWidth - item.Margin.HorizontalThickness, availableHeight - item.Margin.VerticalThickness);
+        var iView = cell as IView;
+        var measure = GetOrientation() is ScrollOrientation.Vertical
+            ? iView!.Measure(availableSpace.Width - item.Margin.HorizontalThickness, double.PositiveInfinity)
+            : iView!.Measure(double.PositiveInfinity, availableSpace.Height - item.Margin.VerticalThickness);
 
         adapter.UnbindCell(cell, item.AdapterItem!, item.Position);
         CacheCell(item);
@@ -239,17 +241,17 @@ public partial class LinearItemsLayoutManager : VirtualizeItemsLayoutManager
     protected virtual Size MeasureCellVertical(VirtualizeListViewItem item, double availableWidth)
     {
         var cell = item.Cell!;
-        var iview = cell as IView;
+        var iView = cell as IView;
 
-        return iview!.Measure(availableWidth - item.Margin.HorizontalThickness, double.PositiveInfinity);
+        return iView!.Measure(availableWidth - item.Margin.HorizontalThickness, double.PositiveInfinity);
     }
 
     protected virtual Size MeasureCellHorizontal(VirtualizeListViewItem item, double availableHeight)
     {
         var cell = item.Cell!;
-        var iview = cell as IView;
+        var iView = cell as IView;
 
-        return iview!.Measure(double.PositiveInfinity, availableHeight - item.Margin.VerticalThickness);
+        return iView!.Measure(double.PositiveInfinity, availableHeight - item.Margin.VerticalThickness);
     }
 
     protected override Size LayoutManagerMeasure(double widthConstraint, double heightConstraint)
@@ -275,8 +277,8 @@ public partial class LinearItemsLayoutManager : VirtualizeItemsLayoutManager
             var availableWidth = availableSpace.Width;
 
             Func<VirtualizeListViewItem, Rect, double> offsetFunc = needsAdjustScroll
-               ? GetOffsetToAdjustScrollVertical
-               : static (item, prevBounds) => 0d;
+                ? GetOffsetToAdjustScrollVertical
+                : static (item, prevBounds) => 0d;
 
             for (int i = 0; i < length; i++)
             {
@@ -396,374 +398,16 @@ public partial class LinearItemsLayoutManager : VirtualizeItemsLayoutManager
         foreach (var item in items)
         {
             var cell = item.Cell!;
-            var iview = cell as IView;
+            var iView = cell as IView;
 
             Rect newBounds = arrangeFunc(item, maxOppositeDirectionSize);
 
 #if MACIOS
             if (newBounds == cell.Bounds) continue;
 #endif
-            iview!.Arrange(newBounds);
+            iView!.Arrange(newBounds);
         }
 
         return new(maxWidthWithMargin, maxHeightWithMargin);
     }
-
-    #region Items Animation
-
-    protected override void OnRemovedLeadingVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift,
-        List<VirtualizeListViewItem> removedItems,
-        Rect prevViewport, double scrollDeltaX, double scrollDeltaY)
-    {
-        var orientation = GetOrientation();
-        if (orientation is ScrollOrientation.Both) return;
-
-        var listView = ListView!;
-        var padding = listView.Padding;
-        var scrollX = listView.ScrollX;
-        var scrollY = listView.ScrollY;
-
-        var availableSpace = AvailableSpace;
-        var viewport = Viewport;
-
-        var firstRemovedItemPosition = removedItems[0].Position;
-
-        List<(VirtualizeListViewItem item, Rect prevBounds)> itemsBeforeRemoved = [];
-        List<(VirtualizeListViewItem item, Rect prevBounds)> itemsAfterRemoved = [];
-        List<(VirtualizeListViewItem item, Rect prevBounds)> visibleItemsAfterRemoved = [];
-        List<(VirtualizeListViewItem item, Rect prevBounds)> invisibleItemsAfterRemoved = [];
-        foreach (var tpl in itemsToShift)
-        {
-            if (tpl.item.Position < firstRemovedItemPosition)
-            {
-                itemsBeforeRemoved.Add(tpl);
-                continue;
-            }
-
-            itemsAfterRemoved.Add(tpl);
-
-            if (IsOnScreen(tpl.item, viewport) && tpl.item.Cell is not null)
-            {
-                visibleItemsAfterRemoved.Add(tpl);
-                continue;
-            }
-
-            invisibleItemsAfterRemoved.Add(tpl);
-        }
-
-        var adapter = Adapter!;
-
-        var firstItemAfterRemoved = itemsAfterRemoved[0];
-
-        double totalAdjustY = 0d, totalAdjustX = 0d;
-        double totalHeightToFill = 0d, totalWidthToFill = 0d;
-
-        if (orientation is ScrollOrientation.Vertical)
-        {
-            totalHeightToFill = firstItemAfterRemoved.prevBounds.Y - firstItemAfterRemoved.item.Margin.Top - prevViewport.Y;
-
-            var availableWidth = availableSpace.Width;
-
-            foreach (var tpl in itemsBeforeRemoved)
-            {
-                if (totalHeightToFill <= 0) break;
-
-                var prevItemBounds = tpl.prevBounds;
-
-                var item = tpl.item;
-                var measure = MeasureItem(item, viewport, availableWidth, double.PositiveInfinity);
-
-                totalAdjustY += measure.Height - prevItemBounds.Height;
-                totalHeightToFill -= measure.Height + item.Margin.VerticalThickness;
-            }
-
-            totalHeightToFill -= padding.Top;
-            if (totalHeightToFill > 0)
-            {
-                scrollDeltaY = 0;
-
-                foreach (var item in visibleItemsAfterRemoved)
-                {
-                    if (item.item.Cell is CellHolder cell)
-                    {
-                        cell.TranslationY += totalHeightToFill;
-                    }
-                }
-
-                listView.AdjustScroll(totalAdjustX, totalAdjustY);
-            }
-            else
-            {
-                totalHeightToFill = 0;
-                scrollDeltaY = totalAdjustY;
-            }
-        }
-        else
-        {
-            totalWidthToFill = firstItemAfterRemoved.prevBounds.X - firstItemAfterRemoved.item.Margin.Left - prevViewport.X;
-
-            var availableHeight = availableSpace.Height;
-
-            foreach (var tpl in itemsBeforeRemoved)
-            {
-                if (totalWidthToFill <= 0) break;
-
-                var prevItemBounds = tpl.prevBounds;
-
-                var item = tpl.item;
-                var measure = MeasureItem(item, viewport, double.PositiveInfinity, availableHeight);
-
-                totalAdjustX += measure.Width - prevItemBounds.Width;
-                totalWidthToFill -= measure.Width + item.Margin.HorizontalThickness;
-            }
-
-            totalWidthToFill -= padding.Left;
-            if (totalWidthToFill > 0)
-            {
-                scrollDeltaX = 0;
-
-                foreach (var item in visibleItemsAfterRemoved)
-                {
-                    if (item.item.Cell is CellHolder cell)
-                    {
-                        cell.TranslationX += totalWidthToFill;
-                    }
-                }
-
-                listView.AdjustScroll(totalAdjustX, totalAdjustY);
-            }
-            else
-            {
-                totalWidthToFill = 0;
-                scrollDeltaX = totalAdjustX;
-            }
-        }
-
-        viewport = Viewport;
-        var scrollDeltaXFinal = viewport.X - prevViewport.X + totalAdjustX;
-        var scrollDeltaYFinal = viewport.Y - prevViewport.Y + scrollDeltaY;
-
-        ApplyScrollDeltaToRemovedItems(removedItems, prevViewport, scrollDeltaXFinal, scrollDeltaYFinal);
-
-        var itemsToPrepare = itemsBeforeRemoved.Concat(invisibleItemsAfterRemoved)
-            .Select(tpl => tpl.item).ToList();
-
-        PrepareItemsForPreTranslationAnimation(itemsToPrepare);
-
-        (this as IView).InvalidateMeasure();
-
-        this.Dispatcher.Dispatch(() =>
-        {
-            CleanupItemsPreTranslationAnimation(itemsToPrepare);
-
-            viewport = Viewport;
-
-            var lastItemRightBottom = itemsBeforeRemoved[^1].item.RightBottom;
-
-            Func<VirtualizeListViewItem, (double newX, double newY)> beforeRemovedTranslationFunc;
-            Func<VirtualizeListViewItem, (double newX, double newY)> afterRemovedTranslationFunc;
-
-            if (orientation is ScrollOrientation.Vertical)
-            {
-                var extraTopOffsetY = scrollY - padding.Top - lastItemRightBottom.Y + totalAdjustY;
-
-                beforeRemovedTranslationFunc = item =>
-                {
-                    var leftTop = item.LeftTop;
-                    var newY = leftTop.Y + extraTopOffsetY;
-                    return (leftTop.X, newY);
-                };
-
-                afterRemovedTranslationFunc = item =>
-                {
-                    var leftTop = item.LeftTop;
-                    var newY = leftTop.Y + totalHeightToFill;
-                    return (leftTop.X, newY);
-                };
-            }
-            else
-            {
-                var extraLeftOffsetX = scrollX - padding.Left - lastItemRightBottom.X;
-
-                beforeRemovedTranslationFunc = item =>
-                {
-                    var leftTop = item.LeftTop;
-                    var newX = leftTop.X + extraLeftOffsetX;
-                    return (newX, leftTop.Y);
-                };
-
-                afterRemovedTranslationFunc = item =>
-                {
-                    var leftTop = item.LeftTop;
-                    var newX = leftTop.X + totalWidthToFill;
-                    return (newX, leftTop.Y);
-                };
-            }
-
-            foreach (var (item, prevBounds) in itemsBeforeRemoved)
-            {
-                if (item.AnyAnimatingAnimation) continue;
-
-                var (newX, newY) = beforeRemovedTranslationFunc(item);
-
-                item.AddTranslationXAnimation(newX, ShiftAnimationDuration, DefaultAnimationDelay);
-                item.AddTranslationYAnimation(newY, ShiftAnimationDuration, DefaultAnimationDelay);
-                item.AnimateAll();
-            }
-
-            foreach (var (item, prevBounds) in itemsAfterRemoved.Where(i => IsOnScreen(i.item, viewport)))
-            {
-                if (item.AnyAnimatingAnimation) continue;
-
-                var (newX, newY) = afterRemovedTranslationFunc(item);
-
-                item.AddTranslationXAnimation(newX, ShiftAnimationDuration, DefaultAnimationDelay);
-                item.AddTranslationYAnimation(newY, ShiftAnimationDuration, DefaultAnimationDelay);
-                item.AnimateAll();
-            }
-        });
-    }
-
-    protected override void OnRemovedMiddleVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift,
-        List<VirtualizeListViewItem> removedItems,
-        Rect prevViewport, double scrollDeltaX, double scrollDeltaY)
-    {
-        var orientation = GetOrientation();
-        if (orientation is ScrollOrientation.Both) return;
-
-        var padding = ListView!.Padding;
-        var scrollX = ListView.ScrollX;
-        var scrollY = ListView.ScrollY;
-
-        var viewport = Viewport;
-
-        List<(VirtualizeListViewItem item, Rect prevBounds)> invisibleItemsToShift = [];
-        List<(VirtualizeListViewItem item, Rect prevBounds)> visibleItemsToShift = [];
-
-        foreach (var tpl in itemsToShift)
-        {
-            if (IsOnScreen(tpl.item, viewport) && tpl.item.Cell is not null)
-            {
-                visibleItemsToShift.Add(tpl);
-                continue;
-            }
-
-            invisibleItemsToShift.Add(tpl);
-        }
-
-        var itemsToPrepare = invisibleItemsToShift.Select(tpl => tpl.item).ToList();
-
-        PrepareItemsForPreTranslationAnimation(itemsToPrepare);
-
-        double totalRemovedHeight = 0d, totalRemovedWidth = 0d;
-        if (orientation is ScrollOrientation.Vertical)
-        {
-            totalRemovedHeight = removedItems.Sum(i => i.Size.Height + i.Margin.VerticalThickness);
-        }
-        else
-        {
-            totalRemovedWidth = removedItems.Sum(i => i.Size.Width + i.Margin.HorizontalThickness);
-        }
-
-        foreach (var (item, prevBounds) in visibleItemsToShift)
-        {
-            if (item.Cell is CellHolder cell)
-            {
-                cell.TranslationX += totalRemovedWidth;
-                cell.TranslationY += totalRemovedHeight;
-            }
-        }
-
-        (this as IView).InvalidateMeasure();
-
-        this.Dispatcher.Dispatch(() =>
-        {
-            CleanupItemsPreTranslationAnimation(itemsToPrepare);
-
-            var viewport = Viewport;
-
-            foreach (var (item, prevBounds) in itemsToShift.Where(tpl => IsOnScreen(tpl.item, viewport) && !tpl.item.AnyAnimatingAnimation))
-            {
-                item.AddTranslationXAnimation(prevBounds.X, ShiftAnimationDuration, DefaultAnimationDelay);
-                item.AddTranslationYAnimation(prevBounds.Y, ShiftAnimationDuration, DefaultAnimationDelay);
-                item.AnimateAll();
-            }
-        });
-    }
-
-    protected override void OnRemovedAllVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift,
-        List<VirtualizeListViewItem> removedItems,
-        Rect prevViewport, double scrollDeltaX, double scrollDeltaY)
-    {
-        var orientation = GetOrientation();
-        if (orientation is ScrollOrientation.Both) return;
-
-        var padding = ListView!.Padding;
-        var scrollX = ListView.ScrollX;
-        var scrollY = ListView.ScrollY;
-
-        ApplyScrollDeltaToRemovedItems(removedItems, prevViewport, scrollDeltaX, scrollDeltaY);
-
-        var itemsToPrepare = itemsToShift.Select(tpl => tpl.item).ToList();
-
-        PrepareItemsForPreTranslationAnimation(itemsToPrepare);
-
-        (this as IView).InvalidateMeasure();
-
-        this.Dispatcher.Dispatch(() =>
-        {
-            CleanupItemsPreTranslationAnimation(itemsToPrepare);
-
-            var viewport = Viewport;
-
-            itemsToShift = [.. itemsToShift.Where(tpl => IsOnScreen(tpl.item, viewport))];
-
-            var firstItemLeftTop = itemsToShift[0].item.LeftTop;
-
-            Func<VirtualizeListViewItem, (double newX, double newY)> translationFunc;
-
-            if (orientation is ScrollOrientation.Vertical)
-            {
-                var extraOffsetY = Viewport.Bottom - firstItemLeftTop.Y;
-
-                translationFunc = item =>
-                {
-                    var leftTop = item.LeftTop;
-                    var newY = leftTop.Y + extraOffsetY;
-                    return (leftTop.X, newY);
-                };
-            }
-            else
-            {
-                var extraOffsetX = Viewport.Right - firstItemLeftTop.X;
-
-                translationFunc = item =>
-                {
-                    var leftTop = item.LeftTop;
-                    var newX = leftTop.X + extraOffsetX;
-                    return (newX, leftTop.Y);
-                };
-            }
-
-            foreach (var (item, prevBounds) in itemsToShift)
-            {
-                if (item.AnyAnimatingAnimation) continue;
-
-                var (newX, newY) = translationFunc(item);
-
-                item.AddTranslationYAnimation(newY, ShiftAnimationDuration, DefaultAnimationDelay);
-                item.AddTranslationXAnimation(newX, ShiftAnimationDuration, DefaultAnimationDelay);
-                item.AnimateAll();
-            }
-        });
-    }
-
-    protected override void OnRemovedTrailingVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift,
-        List<VirtualizeListViewItem> removedItems,
-        Rect prevViewport, double scrollDeltaX, double scrollDeltaY)
-    {
-        OnRemovedAllVisibleItems(itemsToShift, removedItems, prevViewport, scrollDeltaX, scrollDeltaY);
-    }
-
-    #endregion
 }

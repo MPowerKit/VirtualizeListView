@@ -69,7 +69,7 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
     {
         if (GetOrientation() is ScrollOrientation.Both || item.Position < 0) return;
 
-        item.Span = Adapter!.IsSuplementary(item.Position) ? Span : 1;
+        item.Span = Adapter!.IsSupplementary(item.Position) ? Span : 1;
     }
 
     protected virtual void SetupRowColumnForItem(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
@@ -455,8 +455,8 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
             var availableWidth = availableSpace.Width;
 
             Func<VirtualizeListViewItem, Rect, double> offsetFunc = needsAdjustScroll
-               ? GetItemOffsetToAdjustScrollVertical
-               : static (item, prevBounds) => 0d;
+                ? GetItemOffsetToAdjustScrollVertical
+                : static (item, prevBounds) => 0d;
 
             for (int i = 0; i < length;)
             {
@@ -472,11 +472,11 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
                     if (!BeforeItemMeasure(item, viewport)) continue;
 
                     var cell = item.Cell!;
-                    var iview = cell as IView;
+                    var iView = cell as IView;
 
                     var availableItemWidth = GetEstimatedItemSizeVertical(item, availableSpace).Width;
 
-                    item.MeasuredSize = iview!.Measure(availableItemWidth, double.PositiveInfinity);
+                    item.MeasuredSize = iView!.Measure(availableItemWidth, double.PositiveInfinity);
                 }
 
                 double maxHeight = 0d;
@@ -510,8 +510,8 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
             var availableHeight = availableSpace.Height;
 
             Func<VirtualizeListViewItem, Rect, double> offsetFunc = needsAdjustScroll
-               ? GetItemOffsetToAdjustScrollHorizontal
-               : static (item, prevBounds) => 0d;
+                ? GetItemOffsetToAdjustScrollHorizontal
+                : static (item, prevBounds) => 0d;
 
             for (int i = 0; i < length;)
             {
@@ -526,11 +526,11 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
                     if (!BeforeItemMeasure(item, viewport)) continue;
 
                     var cell = item.Cell!;
-                    var iview = cell as IView;
+                    var iView = cell as IView;
 
                     var availableItemHeight = GetEstimatedItemSizeHorizontal(item, availableSpace).Height;
 
-                    item.MeasuredSize = iview!.Measure(double.PositiveInfinity, availableItemHeight);
+                    item.MeasuredSize = iView!.Measure(double.PositiveInfinity, availableItemHeight);
                 }
 
                 double maxWidth = 0d;
@@ -580,36 +580,54 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
         foreach (var item in VisibleItems.OrderBy(static i => i.Position))
         {
             var cell = item.Cell!;
-            var iview = cell as IView;
+            var iView = cell as IView;
 
             Rect newBounds = item.Bounds;
 
 #if MACIOS
             if (newBounds == cell.Bounds) continue;
 #endif
-            iview!.Arrange(newBounds);
+            iView!.Arrange(newBounds);
         }
 
         return new(bounds.Width, bounds.Height);
     }
 
-    protected override void OnRemovedLeadingVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift, List<VirtualizeListViewItem> removedItems, Rect prevViewport, double scrollDeltaX, double scrollDeltaY)
-    {
-        throw new NotImplementedException();
-    }
+    //protected override void OnRemovedLeadingVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift, List<VirtualizeListViewItem> removedItems, Rect prevViewport, double scrollDeltaX, double scrollDeltaY)
+    //{
+    //    throw new NotImplementedException();
+    //}
 
-    protected override void OnRemovedMiddleVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift, List<VirtualizeListViewItem> removedItems, Rect prevViewport, double scrollDeltaX, double scrollDeltaY)
-    {
-        throw new NotImplementedException();
-    }
+    //protected override void OnRemovedMiddleVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift, List<VirtualizeListViewItem> removedItems, Rect prevViewport, double scrollDeltaX, double scrollDeltaY)
+    //{
+    //    throw new NotImplementedException();
+    //}
 
-    protected override void OnRemovedAllVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift, List<VirtualizeListViewItem> removedItems, Rect prevViewport, double scrollDeltaX, double scrollDeltaY)
-    {
-        throw new NotImplementedException();
-    }
+    //protected override void OnRemovedAllVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift, List<VirtualizeListViewItem> removedItems, Rect prevViewport, double scrollDeltaX, double scrollDeltaY)
+    //{
+    //    throw new NotImplementedException();
+    //}
 
-    protected override void OnRemovedTrailingVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift, List<VirtualizeListViewItem> removedItems, Rect prevViewport, double scrollDeltaX, double scrollDeltaY)
+    //protected override void OnRemovedTrailingVisibleItems(List<(VirtualizeListViewItem item, Rect prevBounds)> itemsToShift, List<VirtualizeListViewItem> removedItems, Rect prevViewport, double scrollDeltaX, double scrollDeltaY)
+    //{
+    //    throw new NotImplementedException();
+    //}
+
+    protected override Size MeasureItem(VirtualizeListViewItem item, Rect viewport, Size availableSpace)
     {
-        throw new NotImplementedException();
+        var adapter = Adapter!;
+
+        var cell = ReuseCell(item, viewport);
+        adapter.BindCell(cell, item.AdapterItem!, item.Position);
+
+        var availableItemWidth = GetEstimatedItemSizeVertical(item, availableSpace).Width;
+
+        var iView = cell as IView;
+        var measure = iView!.Measure(availableItemWidth, double.PositiveInfinity);
+
+        adapter.UnbindCell(cell, item.AdapterItem!, item.Position);
+        CacheCell(item);
+
+        return measure;
     }
 }
