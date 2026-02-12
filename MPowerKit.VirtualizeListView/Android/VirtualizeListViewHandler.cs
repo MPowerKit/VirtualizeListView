@@ -32,17 +32,20 @@ public class SmoothScrollView : MauiScrollView
     private OverScroller? _scroller;
     private VirtualizeListView? _listView;
 
-    public SmoothScrollView(Context context, VirtualizeListView listView) : base(context)
+    public SmoothScrollView(Context context, VirtualizeListView listView)
+        : base(context)
     {
         Init(listView);
     }
 
-    public SmoothScrollView(Context context, Android.Util.IAttributeSet attrs, VirtualizeListView listView) : base(context, attrs)
+    public SmoothScrollView(Context context, Android.Util.IAttributeSet attrs, VirtualizeListView listView)
+        : base(context, attrs)
     {
         Init(listView);
     }
 
-    public SmoothScrollView(Context context, Android.Util.IAttributeSet attrs, int defStyleAttr, VirtualizeListView listView) : base(context, attrs, defStyleAttr)
+    public SmoothScrollView(Context context, Android.Util.IAttributeSet attrs, int defStyleAttr, VirtualizeListView listView)
+        : base(context, attrs, defStyleAttr)
     {
         Init(listView);
     }
@@ -63,21 +66,20 @@ public class SmoothScrollView : MauiScrollView
         var dx = (int)this.Context.ToPixels(dxdp);
         var dy = (int)this.Context.ToPixels(dydp);
 
-        if (!_scroller.IsFinished)
-        {
-            var velocity = _scroller.CurrVelocity + dy;
-
-            var direction = _scroller.FinalY < _scroller.CurrY ? -velocity : velocity;
-
-            this.ScrollBy(dx, dy);
-
-            _scroller.ForceFinished(true);
-            base.Fling((int)direction);
-        }
-        else
+        if (_scroller.IsFinished)
         {
             ScrollBy(dx, dy);
+            return;
         }
+
+        var velocity = _scroller.CurrVelocity + dy;
+
+        var direction = _scroller.FinalY < _scroller.CurrY ? -velocity : velocity;
+
+        this.ScrollBy(dx, dy);
+
+        _scroller.ForceFinished(true);
+        base.Fling((int)direction);
     }
 
     public override void Fling(int velocityY)
@@ -93,7 +95,9 @@ public class SmoothScrollView : MauiScrollView
 
         try
         {
-            if (_scroller is not null && (!CanScrollVertically(1) || !CanScrollVertically(-1)) && !_scroller.IsFinished)
+            if (_scroller is not null
+                && (!CanScrollVertically(1) || !CanScrollVertically(-1))
+                && !_scroller.IsFinished)
             {
                 _scroller.AbortAnimation();
             }

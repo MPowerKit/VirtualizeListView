@@ -2,6 +2,16 @@
 
 namespace MPowerKit.VirtualizeListView;
 
+public enum ItemState : ushort
+{
+    IsNew,
+    IsInserted,
+    Idle,
+    ShouldBeShiftedOnInsert,
+    ShouldBeShiftedOnRemove,
+    ShouldBeRemoved
+}
+
 public class VirtualizeListViewItem
 {
     public event EventHandler<CellHolder?> OnCellAttached;
@@ -23,10 +33,10 @@ public class VirtualizeListViewItem
     }
 
     public int Position { get; set; } = -1;
-    public virtual bool IsOnScreen => IntersectsWithViewport();
     public bool IsAttached => Cell?.Attached ?? false;
     public DataTemplate? Template { get; set; }
     public AdapterItem? AdapterItem { get; set; }
+    public ItemState State { get; set; } = ItemState.IsNew;
     public CellHolder? Cell
     {
         get => _cell;
@@ -89,6 +99,8 @@ public class VirtualizeListViewItem
             return new(leftTop.X, leftTop.Y, size.Width, size.Height);
         }
     }
+    public Rect PrevBounds { get; set; }
+    //public bool WasMoved => !PrevBounds.Equals(Bounds);
     public Point RightBottom
     {
         get
@@ -120,16 +132,6 @@ public class VirtualizeListViewItem
         LayoutManager?.OnItemSizeChanged(this);
     }
 
-    protected virtual bool IntersectsWithViewport()
-    {
-        return Bounds.IntersectsWith(LayoutManager.Viewport);
-    }
-
-    public virtual bool IntersectsWithRect(Rect rect)
-    {
-        return Bounds.IntersectsWith(rect);
-    }
-
     #region Animations
 
     protected List<ItemAnimation> PendingAnimations = new(3);
@@ -141,6 +143,7 @@ public class VirtualizeListViewItem
     public bool PreTranslationAnimation { get; set; }
     public bool AnyOpacityAnimation => OpacityAnimationsCount > 0;
     public bool AnyTranslationAnimation => TranslationAnimationsCount > 0;
+    public bool AnyAnimation => AnyOpacityAnimation || AnyTranslationAnimation;
 
     public bool AnyPendingAnimation => PendingAnimations.Count > 0;
     public bool AnyAnimatingAnimation => AnimatingAnimations.Count > 0;
@@ -176,6 +179,62 @@ public class VirtualizeListViewItem
                 case TranslationYAnimation:
                     animationTasks.Add(animation.Animate(this.LeftTop.Y));
                     break;
+            }
+        }
+
+        if (animationTasks.Count != 0)
+        {
+            await foreach (var task in Task.WhenEach(animationTasks))
+            {
+                var animation = await task;
+
+                lock (AnimatingAnimations)
+                {
+                    AnimatingAnimations.Remove(animation);
+                    switch (animation)
+                    {
+                        case OpacityAnimation:
+                            OpacityAnimationsCount--;
+                            break;
+                        case TranslationAnimation:
+                            TranslationAnimationsCount--;
+                            break;
+                    }
+                }
+            }
+        }
+
+        if (finishCallback is not null)
+        {
+            LayoutManager.Dispatcher.Dispatch(() =>
+            {
+                finishCallback();
+            });
+        }
+    }
+
+    public async Task Animate<T>(double currentValue, Action? finishCallback = null)
+       where T : ItemAnimation
+    {
+        List<Task<ItemAnimation>> animationTasks = new(1);
+
+        var animations = PendingAnimations.ToArray();
+        lock (PendingAnimations)
+        {
+            foreach (var animation in animations)
+            {
+                lock (AnimatingAnimations)
+                {
+                    AnimatingAnimations.Add(animation);
+                }
+
+                switch (animation)
+                {
+                    case T:
+                        animationTasks.Add(animation.Animate(currentValue));
+                        PendingAnimations.Remove(animation);
+                        break;
+                }
             }
         }
 
@@ -264,62 +323,6 @@ public class VirtualizeListViewItem
         }
     }
 
-    public async Task Animate<T>(double currentValue, Action? finishCallback = null)
-        where T : ItemAnimation
-    {
-        List<Task<ItemAnimation>> animationTasks = new(1);
-
-        var animations = PendingAnimations.ToArray();
-        lock (PendingAnimations)
-        {
-            foreach (var animation in animations)
-            {
-                lock (AnimatingAnimations)
-                {
-                    AnimatingAnimations.Add(animation);
-                }
-
-                switch (animation)
-                {
-                    case T:
-                        animationTasks.Add(animation.Animate(currentValue));
-                        PendingAnimations.Remove(animation);
-                        break;
-                }
-            }
-        }
-
-        if (animationTasks.Count != 0)
-        {
-            await foreach (var task in Task.WhenEach(animationTasks))
-            {
-                var animation = await task;
-
-                lock (AnimatingAnimations)
-                {
-                    AnimatingAnimations.Remove(animation);
-                    switch (animation)
-                    {
-                        case OpacityAnimation:
-                            OpacityAnimationsCount--;
-                            break;
-                        case TranslationAnimation:
-                            TranslationAnimationsCount--;
-                            break;
-                    }
-                }
-            }
-        }
-
-        if (finishCallback is not null)
-        {
-            LayoutManager.Dispatcher.Dispatch(() =>
-            {
-                finishCallback();
-            });
-        }
-    }
-
     public class ItemAnimation
     {
         protected readonly VirtualizeItemsLayoutManager _layoutManager;
@@ -327,7 +330,7 @@ public class VirtualizeListViewItem
         protected readonly TimeSpan _duration;
         protected readonly string _name;
         protected readonly Action<double> _animateAction;
-        protected readonly double _start;
+        protected double _start;
         protected readonly Action<double, bool> _finished;
         protected readonly TimeSpan _delay;
 
@@ -469,7 +472,7 @@ public class VirtualizeListViewItem
             string name,
             TimeSpan duration,
             Action<double> animateAction,
-            double previousRealCoord,
+            double startCoord,
             Action<double, bool> finished,
             TimeSpan delay)
             : base(
@@ -478,15 +481,15 @@ public class VirtualizeListViewItem
                 name,
                 duration,
                 animateAction,
-                previousRealCoord,
+                startCoord,
                 finished,
                 delay)
         {
         }
 
-        public override async Task<ItemAnimation> Animate(double currentRealCoord)
+        public override async Task<ItemAnimation> Animate(double endCoord)
         {
-            var start = _start - currentRealCoord;
+            var start = _start - endCoord;
 
             if (start == 0d)
             {
@@ -498,7 +501,7 @@ public class VirtualizeListViewItem
 
             _layoutManager.Dispatcher.DispatchDelayed(_delay, () =>
             {
-                _layoutManager.Animate(_name, _animateAction, start: _start - currentRealCoord, end: 0d, length: (uint)_duration.TotalMilliseconds, finished: (v, a) =>
+                _layoutManager.Animate(_name, _animateAction, start: _start, end: endCoord, length: (uint)_duration.TotalMilliseconds, finished: (v, a) =>
                 {
                     _finished(v, a);
                     tcs.SetResult(this);
@@ -515,7 +518,7 @@ public class VirtualizeListViewItem
             VirtualizeItemsLayoutManager layoutManager,
             VirtualizeListViewItem item,
             TimeSpan duration,
-            double previousRealX,
+            double startX,
             TimeSpan delay)
             : base(
                 layoutManager,
@@ -529,7 +532,7 @@ public class VirtualizeListViewItem
                         item.Cell.TranslationX = v;
                     }
                 },
-                previousRealX,
+                startX,
                 (v, a) =>
                 {
                     if (item.Cell is not null)
@@ -541,18 +544,18 @@ public class VirtualizeListViewItem
         {
         }
 
-        public override Task<ItemAnimation> Animate(double currentRealCoord)
+        public override Task<ItemAnimation> Animate(double endX)
         {
-            var point = _start - currentRealCoord;
+            _start -= _item.LeftTop.X;
 
             if (_item.Cell is not null)
-                _item.Cell.TranslationX = point;
+                _item.Cell.TranslationX = _start;
             _layoutManager.Dispatcher.Dispatch(() =>
             {
                 if (_item.Cell is not null)
-                    _item.Cell.TranslationX = point;
+                    _item.Cell.TranslationX = _start;
             });
-            return base.Animate(currentRealCoord);
+            return base.Animate(endX - _item.LeftTop.X);
         }
     }
 
@@ -562,7 +565,7 @@ public class VirtualizeListViewItem
             VirtualizeItemsLayoutManager layoutManager,
             VirtualizeListViewItem item,
             TimeSpan duration,
-            double previousRealY,
+            double startY,
             TimeSpan delay)
             : base(
                 layoutManager,
@@ -576,7 +579,7 @@ public class VirtualizeListViewItem
                         item.Cell.TranslationY = v;
                     }
                 },
-                previousRealY,
+                startY,
                 (v, a) =>
                 {
                     if (item.Cell is not null)
@@ -588,18 +591,18 @@ public class VirtualizeListViewItem
         {
         }
 
-        public override Task<ItemAnimation> Animate(double currentRealCoord)
+        public override Task<ItemAnimation> Animate(double endY)
         {
-            var point = _start - currentRealCoord;
+            _start -= _item.LeftTop.Y;
 
             if (_item.Cell is not null)
-                _item.Cell.TranslationY = point;
+                _item.Cell.TranslationY = _start;
             _layoutManager.Dispatcher.Dispatch(() =>
             {
                 if (_item.Cell is not null)
-                    _item.Cell.TranslationY = point;
+                    _item.Cell.TranslationY = _start;
             });
-            return base.Animate(currentRealCoord);
+            return base.Animate(endY - _item.LeftTop.Y);
         }
     }
 

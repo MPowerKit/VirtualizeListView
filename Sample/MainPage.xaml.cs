@@ -65,7 +65,7 @@ public partial class MainPage
 
         var items = new ObservableRangeCollection<Item>();
 
-        for (int i = 0; i < 500; i++)
+        for (int i = 0; i < 4; i++)
         {
             items.Add(new Item()
             {
@@ -106,13 +106,13 @@ public partial class MainPage
             });
         }
 
-        source.InsertRange(1, list);
+        source.InsertRange(0, list);
     }
 
     private void Button_Clicked_Remove(object sender, EventArgs e)
     {
         var source = listView.ItemsSource as ObservableRangeCollection<Item>;
-        source.RemoveRange(1, 10);
+        source.RemoveRange(0, 2);
     }
 
     private void Button_Clicked_Replace(object sender, EventArgs e)

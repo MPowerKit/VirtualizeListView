@@ -1,5 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 
+using static MPowerKit.VirtualizeListView.VirtualizeListViewItem;
+
 namespace MPowerKit.VirtualizeListView;
 
 public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
@@ -47,7 +49,7 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
             typeof(GridItemsLayoutManager));
     #endregion
 
-    public override VirtualizeListViewItem CreateItemForPosition(int position)
+    public override VirtualizeListViewItem CreateItemForPosition(int position, int totalCount)
     {
         var item = new VirtualizeListViewItem(this)
         {
@@ -59,7 +61,7 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
         SetupSpanForItem(LaidOutItems, item);
         SetupRowColumnForItem(LaidOutItems, item);
 
-        item.Margin = GetItemMargin(LaidOutItems, item);
+        item.Margin = GetItemMargin(item, totalCount);
         item.Size = GetEstimatedItemSize(item, AvailableSpace);
 
         return item;
@@ -129,7 +131,7 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
 
             SetupRowColumnForItem(items, item);
 
-            item.Margin = GetItemMargin(items, item);
+            item.Margin = GetItemMargin(item, count);
         }
     }
 
@@ -185,11 +187,11 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
         return new(EstimatedItemSize, itemSpan * itemHeightPerSpan + totalItemSpacing);
     }
 
-    protected override Thickness GetItemMargin(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
+    protected override Thickness GetItemMargin(VirtualizeListViewItem item, int totalCount)
     {
         var orientation = GetOrientation();
 
-        if (orientation is ScrollOrientation.Both || item.Position <= 0) return new();
+        if (orientation is ScrollOrientation.Both || item.Position < 0 || item.Position >= totalCount - 1) return new();
 
         var horizontalSpacing = HorizontalItemsSpacing;
         var verticalSpacing = VerticalItemSpacing;
@@ -351,6 +353,65 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
         return biggestRight;
     }
 
+    protected override (double dx, double dy) AdjustScrollIfNeededOnInsert(
+        IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item)
+    {
+        var orientation = GetOrientation();
+
+        if (orientation is ScrollOrientation.Both || item.Position == -1) return (0d, 0d);
+
+        double dx = 0d, dy = 0d;
+
+        if (orientation is ScrollOrientation.Vertical)
+        {
+            dy = item.RightBottom.Y - item.PrevBounds.Bottom;
+            if (dy == 0d) return (0d, 0d);
+        }
+        else
+        {
+            dx = item.RightBottom.X - item.PrevBounds.Right;
+            if (dx == 0d) return (0d, 0d);
+        }
+
+        var prevScrollY = ListView!.ScrollY;
+
+        ListView!.AdjustScroll(dx, dy);
+
+        var newScrollY = ListView!.ScrollY;
+
+        return (dx, newScrollY - prevScrollY);
+    }
+
+    protected override (double dx, double dy) AdjustScrollIfNeededOnInsert(IReadOnlyList<VirtualizeListViewItem> items,
+        IReadOnlyList<VirtualizeListViewItem> insertedItems, VirtualizeListViewItem firstVisibleItem)
+    {
+        var orientation = GetOrientation();
+
+        if (orientation is ScrollOrientation.Both || firstVisibleItem.Position == -1
+            || insertedItems.Count == 0) return (0d, 0d);
+
+        double dx = 0d, dy = 0d;
+
+        if (orientation is ScrollOrientation.Vertical)
+        {
+            dy = firstVisibleItem.LeftTop.Y - firstVisibleItem.PrevBounds.Top;
+            if (dy == 0d) return (0d, 0d);
+        }
+        else
+        {
+            dx = firstVisibleItem.LeftTop.X - firstVisibleItem.PrevBounds.Left;
+            if (dx == 0d) return (0d, 0d);
+        }
+
+        var prevScrollY = ListView!.ScrollY;
+
+        ListView!.AdjustScroll(dx, dy);
+
+        var newScrollY = ListView!.ScrollY;
+
+        return (dx, newScrollY - prevScrollY);
+    }
+
     protected override bool AdjustScrollIfNeeded(IReadOnlyList<VirtualizeListViewItem> items, VirtualizeListViewItem item, Rect prevBoundsOfItem)
     {
         var orientation = GetOrientation();
@@ -446,6 +507,7 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
         var padding = listView.Padding;
         var availableSpace = AvailableSpace;
         var viewport = Viewport;
+        var prevViewport = PrevViewport;
 
         double totalOffsetToAdjustScrollX = 0d, totalOffsetToAdjustScrollY = 0d;
         Size desiredSize;
@@ -458,6 +520,7 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
                 ? GetItemOffsetToAdjustScrollVertical
                 : static (item, prevBounds) => 0d;
 
+            double? startY = null;
             for (int i = 0; i < length;)
             {
                 double maxOffsetY = 0d;
@@ -466,10 +529,19 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
 
                 var slice = span.Slice(i, itemsCountInRow);
 
-                for (int j = 0; j < slice.Length; j++)
+                i += itemsCountInRow;
+
+                bool allVisible = true;
+                int j;
+
+                for (j = 0; j < itemsCountInRow; j++)
                 {
                     var item = slice[j];
-                    if (!BeforeItemMeasure(item, viewport)) continue;
+                    if (!BeforeItemMeasure(item, viewport))
+                    {
+                        allVisible = false;
+                        continue;
+                    }
 
                     var cell = item.Cell!;
                     var iView = cell as IView;
@@ -479,26 +551,44 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
                     item.MeasuredSize = iView!.Measure(availableItemWidth, double.PositiveInfinity);
                 }
 
+                if (!allVisible)
+                {
+                    for (j = 0; j < itemsCountInRow; j++)
+                    {
+                        var item = slice[j];
+                        startY = AnimateItemVertically(item, allVisible, viewport, prevViewport, startY);
+                        item.PrevBounds = item.Bounds;
+                    }
+                    continue;
+                }
+
                 double maxHeight = 0d;
-                for (int j = 0; j < slice.Length; j++)
+                for (j = 0; j < itemsCountInRow; j++)
                 {
                     maxHeight = Math.Max(maxHeight, slice[j].MeasuredSize.Height);
                 }
 
-                var finishIndex = i + itemsCountInRow;
-                for (; i < finishIndex; i++)
+                for (j = 0; j < itemsCountInRow; j++)
                 {
-                    var item = items[i];
+                    var item = slice[j];
 
-                    var prevBounds = item.Bounds;
+                    try
+                    {
+                        var prevBounds = item.Bounds;
 
-                    item.Size = new(item.MeasuredSize.Width, maxHeight);
+                        item.Size = new(item.MeasuredSize.Width, maxHeight);
 
-                    if (item.Bounds == prevBounds) continue;
+                        if (item.Bounds == prevBounds) continue;
 
-                    ShiftItemsConsecutivelyVertical(items, item.Position + 1, length);
+                        ShiftItemsConsecutivelyVertical(items, item.Position + 1, length);
 
-                    maxOffsetY = Math.Max(maxOffsetY, offsetFunc(item, prevBounds));
+                        maxOffsetY = Math.Max(maxOffsetY, offsetFunc(item, prevBounds));
+                    }
+                    finally
+                    {
+                        startY = AnimateItemVertically(item, allVisible, viewport, prevViewport, startY);
+                        item.PrevBounds = item.Bounds;
+                    }
                 }
 
                 totalOffsetToAdjustScrollY += maxOffsetY;
@@ -568,7 +658,93 @@ public partial class GridItemsLayoutManager : VirtualizeItemsLayoutManager
             }
         }
 
+        PrevViewport = viewport;
+
         return desiredSize;
+    }
+
+    protected virtual double? AnimateItemVertically(VirtualizeListViewItem item, bool isOnScreen, Rect viewport, Rect prevViewport, double? startY)
+    {
+        try
+        {
+            switch (item.State)
+            {
+                case ItemState.IsNew when item.Cell is CellHolder cell:
+                    {
+                        item.AddFadeInAnimation(OpacityAnimationDuration, ZeroAnimationDelay);
+                        item.Animate<OpacityAnimation>(1d);
+
+                        return (startY is null) ? item.LeftTop.Y : startY;
+                    }
+                case ItemState.IsInserted when item.Cell is CellHolder cell:
+                    {
+                        //var dY = viewport.Y - prevViewport.Y;
+                        //if (dY != 0) cell.TranslationY = dY;
+
+                        //var dX = item.PrevBounds.X - item.LeftTop.X;
+                        //if (dX != 0) cell.TranslationX = dX;
+
+                        item.AddFadeInAnimation(OpacityAnimationDuration, DefaultAnimationDelay);
+                        item.Animate<OpacityAnimation>(1d);
+
+                        return (startY is null) ? item.LeftTop.Y : startY;
+                    }
+                case ItemState.ShouldBeShiftedOnInsert:
+                    {
+                        Action detachAction;
+
+                        var wasOnScreen = WasOnScreen(item, viewport);
+                        if (isOnScreen)
+                        {
+                            detachAction = () => { };
+                            if (!wasOnScreen)
+                            {
+                                item.PrevBounds = new(new(item.PrevBounds.X, item.LeftTop.Y - item.Margin.Top - item.Size.Height),
+                                    item.Size);
+                            }
+                        }
+                        else
+                        {
+                            if (!wasOnScreen) break;
+                            detachAction = () => DetachCell(item);
+                        }
+
+                        item.AddTranslationYAnimation(item.PrevBounds.Y, ShiftAnimationDuration, ZeroAnimationDelay);
+                        item.AddTranslationXAnimation(item.PrevBounds.X, ShiftAnimationDuration, ZeroAnimationDelay);
+                        item.Animate<TranslationXAnimation>(item.LeftTop.X, detachAction);
+                        double endY = item.LeftTop.Y;
+                        if (startY is double sY && !isOnScreen && wasOnScreen)
+                        {
+                            var extraOffsetY = prevViewport.Bottom - sY;
+                            if (extraOffsetY <= item.LeftTop.Y - item.PrevBounds.Y)
+                            {
+                                endY = item.PrevBounds.Y + extraOffsetY;
+                            }
+                        }
+                        item.Animate<TranslationYAnimation>(endY, detachAction);
+                    }
+                    break;
+                case ItemState.ShouldBeShiftedOnRemove:
+                    {
+
+                    }
+                    break;
+                case ItemState.ShouldBeRemoved:
+                    {
+                        if (isOnScreen) DetachCell(item);
+                    }
+                    break;
+                case ItemState.Idle:
+                default:
+                    break;
+            }
+        }
+        finally
+        {
+            item.State = ItemState.Idle;
+        }
+
+        return startY;
     }
 
     public override Size ArrangeChildren(Rect bounds)

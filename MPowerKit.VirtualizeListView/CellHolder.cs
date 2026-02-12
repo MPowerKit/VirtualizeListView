@@ -35,14 +35,21 @@ public class CellHolder : Grid
                 return;
             }
 
-            if (!value.AnyOpacityAnimation)
-            {
-                this.Opacity = 1d;
-            }
-            if (!value.AnyTranslationAnimation && !value.PreTranslationAnimation)
+            ZIndex = value.Position;
+
+            //if (value.State is not ItemState.Idle) return;
+            //if (!value.AnyOpacityAnimation)
+            //{
+            this.Opacity = 1d;
+            //}
+            //if (!value.AnyTranslationAnimation && !value.PreTranslationAnimation)
+            //{
+            if (value.State is not
+                (ItemState.ShouldBeShiftedOnInsert or ItemState.ShouldBeShiftedOnRemove))
             {
                 GetFromCache();
             }
+            //}
         }
     }
     //public bool IsCached => Item is null;

@@ -136,13 +136,13 @@
                 </ResourceDictionary>
             </mpowerkit:VirtualizeListView.Resources>
             <mpowerkit:VirtualizeListView.ItemsLayout>
-                <!--<mpowerkit:LinearLayout InitialCachePoolSize="2"
-                                        ItemSpacing="15" />-->
+                <mpowerkit:LinearLayout InitialCachePoolSize="2"
+                                        ItemSpacing="15" />
 
-                <mpowerkit:GridLayout HorizontalItemSpacing="15"
+                <!--<mpowerkit:GridLayout HorizontalItemSpacing="15"
                                       InitialCachePoolSize="0"
                                       Span="3"
-                                      VerticalItemSpacing="15" />
+                                      VerticalItemSpacing="15" />-->
 
             </mpowerkit:VirtualizeListView.ItemsLayout>
 
