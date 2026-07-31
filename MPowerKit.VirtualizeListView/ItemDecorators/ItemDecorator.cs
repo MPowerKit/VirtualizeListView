@@ -52,7 +52,14 @@ public class StickyHeaderItemDecorator : ItemDecorator
         var originalHeaderItem = GetGroupHeaderItemForPosition(topChildPosition, _layoutManger.ReadOnlyLaidOutItems);
         if (originalHeaderItem is null) return;
 
-        if (_prevStickyHeaderItem?.Position != originalHeaderItem.Position)
+        // Also recreate when the Position matches but the underlying group instance doesn't:
+        // _stickyHeader lives outside LaidOutItems/the cache pool, so a full ItemsSource reset
+        // (refresh, re-grouping) never recycles it. Since the first group almost always stays
+        // at Position 0, comparing Position alone made this reuse the old cell - still bound to
+        // the previous group's data - after every refresh.
+        if (_prevStickyHeaderItem is null
+            || _prevStickyHeaderItem.Position != originalHeaderItem.Position
+            || !ReferenceEquals(_prevStickyHeaderItem.AdapterItem?.Data, originalHeaderItem.AdapterItem?.Data))
         {
             var item = _layoutManger.CreateItemForPosition(originalHeaderItem.Position);
             item.Size = originalHeaderItem.Size;
